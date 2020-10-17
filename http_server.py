@@ -40,7 +40,7 @@ def switchContentType(contentType=None):
 
 
 def httpDateFormat():
-    return formatdate(timeval=None, localtime=False, usegmt=True)
+    return str(formatdate(timeval=None, localtime=False, usegmt=True))
 
 
 def getParsedData(connectionData=[]):
@@ -71,16 +71,27 @@ def getValidFilePath(requestedPath=""):
     if requestedPath == None:
         STATUSCODE = 404
         return filePath + "not_found.html"
-    path = requestedPath.split("/")
-    if path[1] == '':
+    # path = requestedPath.split("/")
+    # if path[1] == '':
+    #     return filePath + "index.html"
+    # else:
+    #     return filePath + "/".join(path[1:])
+    if requestedPath == "/":
         return filePath + "index.html"
     else:
-        return filePath + "/".join(path[1:])
+        return filePath + str(requestedPath[1:])
 
 
 def getRequestedFile(requestedPath="", fileMode=""):
     global filePath, STATUSCODE
     finalFile = ""
+    finalExtension = ""
+    try:
+        fileExtension = requestedPath.split(".")[-1]
+        if fileExtension == "/":
+            fileExtension = "html"
+    except:
+        pass
     try:
         requestedPath = getValidFilePath(requestedPath)
         requestedFile = open(requestedPath, fileMode)
@@ -88,60 +99,54 @@ def getRequestedFile(requestedPath="", fileMode=""):
         try:
             requestedFile = open(filePath + "not_found.html", "r")
             STATUSCODE = 404
+            fileExtension = "html"
         except:
             pass
     with requestedFile:
         finalFile = requestedFile.read()
-    return finalFile
+    return finalFile, fileExtension
 
 
 def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
     global STATUSCODE, imageFileExtensions, filePath
+    finalFile = response = ""
+    fileExtension = "html"
+    STATUSCODE = 200
     Response = {
         "Date": httpDateFormat(),
         "Server": "Delta-Server/0.0.1 (Ubuntu)",
         "Connection": "Close",
+        # "Status": STATUSCODE str()
     }
-    finalFile = response = ""
-    STATUSCODE = 200
-    if httpVersion == None or httpVersion != "HTTP/1.1":
+    if httpVersion != "HTTP/1.1" or "Host" not in restHeaders:
         STATUSCODE = 400
         httpVersion = "HTTP/1.1"
         with open(filePath + "bad_request.html", "r") as requestedFile:
             finalFile = requestedFile.read()
         response = httpVersion + switchStatusCode(STATUSCODE) + "\n"
-        Response["Content-Type"] = switchContentType("html")
+        Response["Content-Type"] = switchContentType(fileExtension)
         Response["Content-Length"] = str(len(finalFile))
+        # Response["Status"] = STATUSCODE
         for key, value in Response.items():
             response += key + ": " + value + "\n"
-        response += "\n" + finalFile
+        response += "\n" + finalFile + "\n"
         response = response.encode()
     elif requestedPath.endswith((".html", "/", ".json", ".js")):
-        fileExtension = ""
-        try:
-            fileExtension = requestedPath.split(".")[-1]
-            if fileExtension == "/":
-                fileExtension = "html"
-        except:
-            pass
-        finalFile = getRequestedFile(requestedPath, "r")
+        finalFile, fileExtension = getRequestedFile(requestedPath, "r")
         response = httpVersion + switchStatusCode(STATUSCODE) + "\n"
         Response["Content-Type"] = switchContentType(fileExtension)
         Response["Content-Length"] = str(len(finalFile))
+        # Response["Status"] = STATUSCODE
         for key, value in Response.items():
             response += key + ": " + value + "\n"
-        response += "\n" + finalFile
+        response += "\n" + finalFile + "\n"
         response = response.encode()
     elif requestedPath.endswith(tuple(imageFileExtensions)):
-        fileExtension = ""
-        try:
-            fileExtension = requestedPath.split(".")[-1]
-        except:
-            pass
-        finalFile = getRequestedFile(requestedPath, "rb")
+        finalFile, fileExtension = getRequestedFile(requestedPath, "rb")
         response = httpVersion + switchStatusCode(STATUSCODE) + "\n"
         Response["Content-Type"] = switchContentType(fileExtension)
         Response["Content-Length"] = str(len(finalFile))
+        # Response["Status"] = STATUSCODE
         for key, value in Response.items():
             response += key + ": " + value + "\n"
         response += "\n"
@@ -151,11 +156,12 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
         with open(filePath + "not_found.html", "r") as requestedFile:
             finalFile = requestedFile.read()
         response = httpVersion + switchStatusCode(STATUSCODE) + "\n"
-        Response["Content-Type"] = switchContentType("html")
+        Response["Content-Type"] = switchContentType(fileExtension)
         Response["Content-Length"] = str(len(finalFile))
+        # Response["Status"] = STATUSCODE
         for key, value in Response.items():
             response += key + ": " + value + "\n"
-        response += "\n" + finalFile
+        response += "\n" + finalFile + "\n"
         response = response.encode()
     return response
 
@@ -171,6 +177,14 @@ def eachClientThread(clientConnection=None):
             if requestedMethod == "GET":
                 response = handleGETRequest(
                     httpVersion, restHeaders, requestedPath)
+            elif requestedMethod == "POST":
+                pass
+            elif requestedMethod == "PUT":
+                pass
+            elif requestedMethod == "DELETE":
+                pass
+            elif requestedMethod == "HEAD":
+                pass
             clientConnection.send(response)
             # try:
             #     totalClientConnections.remove(clientConnection)
