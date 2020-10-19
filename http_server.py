@@ -2,9 +2,11 @@ from socket import *
 import threading
 import sys
 from email.utils import formatdate
+import os
 
 totalClientConnections = []
-filePath = "/home/viraj007/Semester 5/CN/Project/final/ResponseFiles/"
+# filePath = "/home/viraj007/Semester 5/CN/Project/final/ResponseFiles/"
+filePath = "ResponseFiles"
 STATUSCODE = None
 imageFileExtensions = [".png", ".jpeg", ".jpg",
                        ".ico", ".webp", ".apng", ".gif", ".bmp", ".svg"]
@@ -51,7 +53,6 @@ def httpDateFormat():
 
 def getParsedData(connectionData=None):
     parsedData = connectionData.split("\r\n")
-    # print(parsedData)
     headerEndCount = 0
     requestedMethod = None
     requestedPath = ""
@@ -106,13 +107,17 @@ def getParsedData(connectionData=None):
 
 def getValidFilePath(requestedPath=""):
     global filePath, STATUSCODE
-    if requestedPath == None:
-        STATUSCODE = 404
-        return filePath + "not_found.html"
-    if requestedPath == "/":
-        return filePath + "index.html"
+    requestedPath = str(requestedPath)
+    if os.path.isdir(filePath + requestedPath):
+        if requestedPath.endswith(('/')):
+            return filePath + requestedPath + "index.html"
+        else:
+            return filePath + requestedPath + "/index.html"
+    elif os.path.isfile(filePath + requestedPath):
+        return filePath + requestedPath
     else:
-        return filePath + str(requestedPath[1:])
+        STATUSCODE = 404
+        return filePath + "/not_found.html"
 
 
 def getRequestedFile(requestedPath="", fileMode=""):
@@ -120,8 +125,9 @@ def getRequestedFile(requestedPath="", fileMode=""):
     finalFile = ""
     finalExtension = ""
     try:
-        fileExtension = requestedPath.split(".")[-1]
-        if fileExtension == "/":
+        if os.path.isfile(filePath + requestedPath):
+            fileExtension = requestedPath.split(".")[-1]
+        else:
             fileExtension = "html"
     except:
         pass
@@ -129,12 +135,7 @@ def getRequestedFile(requestedPath="", fileMode=""):
         requestedPath = getValidFilePath(requestedPath)
         requestedFile = open(requestedPath, fileMode)
     except:
-        try:
-            requestedFile = open(filePath + "not_found.html", "r")
-            STATUSCODE = 404
-            fileExtension = "html"
-        except:
-            pass
+        pass
     with requestedFile:
         finalFile = requestedFile.read()
     return finalFile, fileExtension
@@ -149,7 +150,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
     if httpVersion != "HTTP/1.1" or "Host" not in restHeaders:
         STATUSCODE = 400
         httpVersion = "HTTP/1.1"
-        with open(filePath + "bad_request.html", "r") as requestedFile:
+        with open(filePath + "/bad_request.html", "r") as requestedFile:
             finalFile = requestedFile.read()
         response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
         Response["Content-Type"] = switchContentType(fileExtension)
@@ -157,17 +158,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
         # Response["Status"] = STATUSCODE
         for key, value in Response.items():
             response += key + ": " + value + "\r\n"
-        response += "\r\n" + finalFile + "\n"
-        response = response.encode()
-    elif requestedPath.endswith((".html", "/", ".json", ".js")):
-        finalFile, fileExtension = getRequestedFile(requestedPath, "r")
-        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-        Response["Content-Type"] = switchContentType(fileExtension)
-        Response["Content-Length"] = str(len(finalFile))
-        # Response["Status"] = STATUSCODE
-        for key, value in Response.items():
-            response += key + ": " + value + "\r\n"
-        response += "\r\n" + finalFile + "\n"
+        response += "\r\n" + finalFile
         response = response.encode()
     elif requestedPath.endswith(tuple(imageFileExtensions)):
         finalFile, fileExtension = getRequestedFile(requestedPath, "rb")
@@ -180,16 +171,14 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
         response += "\r\n"
         response = response.encode() + finalFile
     else:
-        STATUSCODE = 404
-        with open(filePath + "not_found.html", "r") as requestedFile:
-            finalFile = requestedFile.read()
+        finalFile, fileExtension = getRequestedFile(requestedPath, "r")
         response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
         Response["Content-Type"] = switchContentType(fileExtension)
         Response["Content-Length"] = str(len(finalFile))
         # Response["Status"] = STATUSCODE
         for key, value in Response.items():
             response += key + ": " + value + "\r\n"
-        response += "\r\n" + finalFile + "\n"
+        response += "\r\n" + finalFile
         response = response.encode()
     return response
 
@@ -206,7 +195,6 @@ def eachClientThread(clientConnection=None):
     while True:
         try:
             connectionData = clientConnection.recv(1024).decode('utf-8')
-            # print(connectionData)
             requestedMethod, requestedPath, httpVersion, restHeaders, requestBody = getParsedData(
                 connectionData)
             response = b'HTTP/1.1 200 OK\r\n'
