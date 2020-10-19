@@ -5,6 +5,8 @@ from email.utils import formatdate
 import os
 import json
 
+# default port
+PORT = 4000
 totalClientConnections = []
 # filePath = "/home/viraj007/Semester 5/CN/Project/final/ResponseFiles/"
 filePath = "ResponseFiles"
@@ -57,6 +59,21 @@ def isBadRequest(STATUSCODE, httpVersion, restHeaders):
     return STATUSCODE == 400 or httpVersion != "HTTP/1.1" or "Host" not in restHeaders
 
 
+def parseRequestValueData(value=None):
+    tvalue = value.split("%")
+    value = tvalue[0]
+    if len(tvalue) > 1:
+        for i in range(1, len(tvalue)):
+            try:
+                bytesData = bytes.fromhex(
+                    tvalue[i][:2])
+                value += bytesData.decode("ASCII") + \
+                    tvalue[i][2:]
+            except:
+                pass
+    return value
+
+
 def getParsedData(connectionData=None):
     parsedData = connectionData.split("\r\n")
     headerEndCount = 0
@@ -88,18 +105,7 @@ def getParsedData(connectionData=None):
             for tbody in tempBody:
                 try:
                     key, value = tbody.split("=")
-                    tvalue = value.split("%")
-                    value = tvalue[0]
-                    if len(tvalue) > 1:
-                        for i in range(1, len(tvalue)):
-                            try:
-                                bytesData = bytes.fromhex(
-                                    tvalue[i][:2])
-                                value += bytesData.decode("ASCII") + \
-                                    tvalue[i][2:]
-                            except:
-                                pass
-                    requestBody[key] = value
+                    requestBody[key] = parseRequestValueData(value)
                 except:
                     pass
         elif "multipart/form-data" in restHeaders["Content-Type"]:
@@ -178,9 +184,56 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
             response += key + ": " + value + "\r\n"
         response += "\r\n"
         response = response.encode() + finalFile
-    elif len(splitReqPath) > 1 and splitReqPath[0].endswith(("book")):
-        print("Reached")
-        pass
+    elif len(splitReqPath) <= 2 and splitReqPath[0].endswith(("book")):
+        params = ""
+        try:
+            params = splitReqPath[1].split("&")
+        except:
+            pass
+        query = {}
+        requestedData = {}
+        if len(params) <= 2 and len(params) > 0:
+            for p in params:
+                try:
+                    key, value = p.split("=")
+                    query[key] = parseRequestValueData(value)
+                except:
+                    pass
+            with open(filePath + "/server_data.json") as dataFile:
+                jsonDataFile = json.load(dataFile)
+            for data in jsonDataFile:
+                try:
+                    if "bookID" in query and "name" not in query and data["bookID"] == int(query["bookID"]):
+                        requestedData = dict(data)
+                        break
+                    elif "name" in query and "bookID" not in query and data["name"] == query["name"]:
+                        requestedData = dict(data)
+                        break
+                    elif "bookID" in query and "name" in query and data["name"] == query["name"] and data["bookID"] == int(query["bookID"]):
+                        requestedData = dict(data)
+                        break
+                except:
+                    pass
+        elif len(params) == 0:
+            with open(filePath + "/server_data.json") as dataFile:
+                jsonDataFile = json.load(dataFile)
+                requestedData = jsonDataFile
+        if not requestedData:
+            STATUSCODE = 404
+            with open(filePath + "/not_found.html", "r") as outputFile:
+                finalFile = outputFile.read()
+                Response["Content-Length"] = str(len(finalFile))
+                Response["Content-Type"] = switchContentType("html")
+        else:
+            STATUSCODE = 200
+            Response["Content-Length"] = str(len(str(requestedData)))
+            Response["Content-Type"] = switchContentType("json")
+            finalFile = json.dumps(requestedData)
+        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+        for key, value in Response.items():
+            response += key + ": " + value + "\r\n"
+        response += "\r\n" + finalFile
+        response = response.encode()
     else:
         STATUSCODE = 200
         finalFile, fileExtension = getRequestedFile(requestedPath, "r")
@@ -295,8 +348,12 @@ def startServer(serverSocket=None):
 
 
 def establishConnection(argv=[]):
+    global PORT
     serverSocket = socket(AF_INET, SOCK_STREAM)
-    serverPort = int(argv[1])
+    try:
+        serverPort = int(argv[1])
+    except:
+        serverPort = PORT
     serverSocket.bind(('', serverPort))
     serverSocket.listen()
     return serverSocket
