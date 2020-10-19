@@ -3,6 +3,7 @@ import threading
 import sys
 from email.utils import formatdate
 import os
+import json
 
 totalClientConnections = []
 # filePath = "/home/viraj007/Semester 5/CN/Project/final/ResponseFiles/"
@@ -13,7 +14,7 @@ imageFileExtensions = [".png", ".jpeg", ".jpg",
 Response = {
     "Date": "",
     "Server": "Delta-Server/0.0.1 (Ubuntu)",
-    "Connection": "Close",
+    "Connection": "close",
     # "Status": STATUSCODE str()
 }
 
@@ -21,6 +22,7 @@ Response = {
 def switchStatusCode(code=None):
     codeTable = {
         200: " 200 OK",
+        201: " 201 Created",
         400: " 400 Bad Request",
         404: " 404 Not Found",
     }
@@ -51,6 +53,10 @@ def httpDateFormat():
     return str(formatdate(timeval=None, localtime=False, usegmt=True))
 
 
+def isBadRequest(STATUSCODE, httpVersion, restHeaders):
+    return STATUSCODE == 400 or httpVersion != "HTTP/1.1" or "Host" not in restHeaders
+
+
 def getParsedData(connectionData=None):
     parsedData = connectionData.split("\r\n")
     headerEndCount = 0
@@ -76,7 +82,7 @@ def getParsedData(connectionData=None):
             break
     if requestedMethod == "GET":
         pass
-    elif requestedMethod == "POST":
+    elif requestedMethod == "POST" and requestedPath.endswith(('book', 'book/')):
         if "application/x-www-form-urlencoded" in restHeaders["Content-Type"]:
             tempBody = parsedData[headerEndCount + 1].split("&")
             for tbody in tempBody:
@@ -100,7 +106,8 @@ def getParsedData(connectionData=None):
             # reqBoundary = restHeaders["Content-Type"].split("boundary=")[1]
             reqBody = parsedData[headerEndCount + 1:]
             for i in range(1, len(reqBody) - 4, 4):
-                tkey = reqBody[i].split(";")[1].split("name=")[1].strip("\"")
+                tkey = reqBody[i].split(";")[1].split("name=")[
+                    1].strip("\"")
                 requestBody[tkey] = reqBody[i + 2]
     return requestedMethod, requestedPath, httpVersion, restHeaders, requestBody
 
@@ -145,9 +152,9 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
     global STATUSCODE, imageFileExtensions, filePath, Response
     finalFile = response = ""
     fileExtension = "html"
-    STATUSCODE = 200
     Response["Date"] = httpDateFormat()
-    if httpVersion != "HTTP/1.1" or "Host" not in restHeaders:
+    splitReqPath = requestedPath.split("?")
+    if isBadRequest(STATUSCODE, httpVersion, restHeaders):
         STATUSCODE = 400
         httpVersion = "HTTP/1.1"
         with open(filePath + "/bad_request.html", "r") as requestedFile:
@@ -161,6 +168,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
         response += "\r\n" + finalFile
         response = response.encode()
     elif requestedPath.endswith(tuple(imageFileExtensions)):
+        STATUSCODE = 200
         finalFile, fileExtension = getRequestedFile(requestedPath, "rb")
         response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
         Response["Content-Type"] = switchContentType(fileExtension)
@@ -170,7 +178,11 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
             response += key + ": " + value + "\r\n"
         response += "\r\n"
         response = response.encode() + finalFile
+    elif len(splitReqPath) > 1 and splitReqPath[0].endswith(("book")):
+        print("Reached")
+        pass
     else:
+        STATUSCODE = 200
         finalFile, fileExtension = getRequestedFile(requestedPath, "r")
         response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
         Response["Content-Type"] = switchContentType(fileExtension)
@@ -184,9 +196,57 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
 
 
 def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBody={}):
-    global Response
+    global Response, STATUSCODE, filePath
+    finalFile = response = ""
+    fileExtension = "html"
     Response["Date"] = httpDateFormat()
-    pass
+    if not requestedPath.endswith(('book', 'book/')) or isBadRequest(STATUSCODE, httpVersion, restHeaders):
+        STATUSCODE = 400
+        httpVersion = "HTTP/1.1"
+        with open(filePath + "/bad_request.html", "r") as requestedFile:
+            finalFile = requestedFile.read()
+        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+        Response["Content-Type"] = switchContentType(fileExtension)
+        Response["Content-Length"] = str(len(finalFile))
+        # Response["Status"] = STATUSCODE
+        for key, value in Response.items():
+            response += key + ": " + value + "\r\n"
+        response += "\r\n" + finalFile
+        response = response.encode()
+    else:
+        STATUSCODE = 200
+        jsonDataFile = []
+        flag = False
+        bookID = None
+        with open(filePath + "/server_data.json") as dataFile:
+            jsonDataFile = json.load(dataFile)
+        for data in jsonDataFile:
+            if data["name"] == requestBody["name"]:
+                flag = True
+                bookID = data["bookID"]
+                break
+        if not flag:
+            STATUSCODE = 201
+            requestBody["bookID"] = len(jsonDataFile) + 1
+            Response["Content-Location"] = "/book/" + \
+                str(requestBody["bookID"])
+            jsonDataFile.append(requestBody)
+            jsonObject = json.dumps(jsonDataFile, indent=4)
+            with open(filePath + "/server_data.json", "w") as outputFile:
+                outputFile.write(jsonObject)
+            finalFile = "<html><head><title>POST</title></head><body><h1>POST Success</h1></body></html>"
+        else:
+            Response["Content-Location"] = "/book/" + \
+                str(bookID)
+            finalFile = "<html><head><title>POST</title></head><body><h1>Data already present</h1></body></html>"
+        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+        Response["Content-Type"] = switchContentType(fileExtension)
+        Response["Content-Length"] = str(len(finalFile))
+        for key, value in Response.items():
+            response += key + ": " + value + "\r\n"
+        response += "\r\n" + finalFile
+        response = response.encode()
+    return response
 
 
 def eachClientThread(clientConnection=None):
