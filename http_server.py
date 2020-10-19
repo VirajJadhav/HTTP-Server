@@ -55,8 +55,8 @@ def httpDateFormat():
     return str(formatdate(timeval=None, localtime=False, usegmt=True))
 
 
-def isBadRequest(STATUSCODE, httpVersion, restHeaders):
-    return STATUSCODE == 400 or httpVersion != "HTTP/1.1" or "Host" not in restHeaders
+def isBadRequest(httpVersion, restHeaders):
+    return httpVersion != "HTTP/1.1" or "Host" not in restHeaders
 
 
 def parseRequestValueData(value=None):
@@ -160,7 +160,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
     fileExtension = "html"
     Response["Date"] = httpDateFormat()
     splitReqPath = requestedPath.split("?")
-    if isBadRequest(STATUSCODE, httpVersion, restHeaders):
+    if isBadRequest(httpVersion, restHeaders):
         STATUSCODE = 400
         httpVersion = "HTTP/1.1"
         with open(filePath + "/bad_request.html", "r") as requestedFile:
@@ -253,7 +253,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
     finalFile = response = ""
     fileExtension = "html"
     Response["Date"] = httpDateFormat()
-    if not requestedPath.endswith(('book', 'book/')) or isBadRequest(STATUSCODE, httpVersion, restHeaders):
+    if not requestedPath.endswith(('book')) or isBadRequest(httpVersion, restHeaders):
         STATUSCODE = 400
         httpVersion = "HTTP/1.1"
         with open(filePath + "/bad_request.html", "r") as requestedFile:
@@ -266,7 +266,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
             response += key + ": " + value + "\r\n"
         response += "\r\n" + finalFile
         response = response.encode()
-    else:
+    elif requestedPath.endswith(('book')):
         STATUSCODE = 200
         jsonDataFile = []
         flag = False
