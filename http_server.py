@@ -61,9 +61,14 @@ def isBadRequest(httpVersion, restHeaders):
 
 def parseRequestValueData(value=None):
     tvalue = value.split("%")
-    value = tvalue[0]
+    if "+" in tvalue[0]:
+        value = tvalue[0].replace("+", " ")
+    else:
+        value = tvalue[0]
     if len(tvalue) > 1:
-        for i in range(1, len(tvalue)):
+        for i in range(len(tvalue)):
+            if "+" in tvalue[i]:
+                value += tvalue[i].replace("+", " ")
             try:
                 bytesData = bytes.fromhex(
                     tvalue[i][:2])
@@ -99,7 +104,8 @@ def getParsedData(connectionData=None):
             break
     if requestedMethod == "GET":
         pass
-    elif requestedMethod == "POST" and requestedPath.endswith(('book', 'book/')):
+    elif requestedMethod == "POST" and requestedPath.endswith(('book')):
+        # print(parsedData[headerEndCount:])
         if "application/x-www-form-urlencoded" in restHeaders["Content-Type"]:
             tempBody = parsedData[headerEndCount + 1].split("&")
             for tbody in tempBody:
@@ -115,6 +121,7 @@ def getParsedData(connectionData=None):
                 tkey = reqBody[i].split(";")[1].split("name=")[
                     1].strip("\"")
                 requestBody[tkey] = reqBody[i + 2]
+        print(requestBody)
     return requestedMethod, requestedPath, httpVersion, restHeaders, requestBody
 
 
