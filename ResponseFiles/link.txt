@@ -1,0 +1,41 @@
+https://tools.ietf.org/html/rfc2616
+
+
+
+
+https://medium.com/from-the-scratch/http-server-what-do-you-need-to-know-to-build-a-simple-http-server-from-scratch-d1ef8945e4fa
+https://www.jmarshall.com/easy/http/
+https://docs.python.org/3/library/http.server.html?highlight=http
+https://github.com/python/cpython/blob/master/Lib/http/server.py
+https://stackoverflow.com/questions/4726515/what-http-response-headers-are-required
+https://www.ntu.edu.sg/home/ehchua/programming/webprogramming/HTTP_Basics.html
+https://httpd.apache.org/docs/2.4/logs.html
+
+
+
+
+,
+    {
+        "bookID": 2,
+        "name": "Harry Potter-2",
+        "author": "JK Rowling",
+        "genre": "fiction"
+    },
+    {
+        "bookID": 3,
+        "name": "Harry Potter-3",
+        "author": "JK Rowling",
+        "genre": "fiction"
+    },
+    {
+        "bookID": 4,
+        "name": "Harry Potter-4",
+        "author": "JK Rowling",
+        "genre": "fiction"
+    },
+    {
+        "bookID": 5,
+        "name": "Harry Potter-5",
+        "author": "JK Rowling",
+        "genre": "fiction"
+    }
