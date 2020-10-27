@@ -105,9 +105,9 @@ def getParsedData(connectionData=None):
             restHeaders[key] = value
         except:
             break
-    if requestedMethod == "GET":
+    if requestedMethod == "GET" or requestedMethod == "HEAD":
         pass
-    elif requestedMethod == "POST" and requestedPath.endswith(('post')):
+    elif requestedMethod == "POST":
         if "application/x-www-form-urlencoded" in restHeaders["Content-Type"]:
             tempBody = parsedData[headerEndCount + 1].split("&")
             for tbody in tempBody:
@@ -185,7 +185,6 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
     finalFile = response = ""
     fileExtension = "html"
     Response["Date"] = httpDateFormat()
-    splitReqPath = requestedPath.split("?")
     if isBadRequest(httpVersion, restHeaders):
         STATUSCODE = 400
         httpVersion = "HTTP/1.1"
@@ -230,7 +229,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
     response = ""
     fileExtension = "html"
     Response["Date"] = httpDateFormat()
-    if not requestedPath.endswith(('post')) or isBadRequest(httpVersion, restHeaders):
+    if isBadRequest(httpVersion, restHeaders):
         STATUSCODE = 400
         httpVersion = "HTTP/1.1"
         with open(filePath + "/bad_request.html", "r") as requestedFile:
@@ -242,7 +241,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
             response += key + ": " + value + "\r\n"
         response += "\r\n" + finalFile
         response = response.encode()
-    elif requestedPath.endswith(('post')):
+    else:
         STATUSCODE = 201
         if "filename" in requestBody:
             tName = requestBody["filename"].split(".")
@@ -254,7 +253,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
         for key, value in requestBody.items():
             newPostData += "\t" + str(key) + " = " + str(value) + "\n"
         newPostData += "\n" + "#"*60 + "\n\n"
-        Response["Content-Location"] = "/post"
+        Response["Content-Location"] = requestedPath
         with open(filePath + "/server_data.txt", "a") as outputFile:
             outputFile.write(newPostData)
         response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
@@ -264,6 +263,43 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
             response += key + ": " + value + "\r\n"
         response += "\r\n" + finalFile
         response = response.encode()
+    return response
+
+
+def handleHEADRequest(httpVersion="", restHeaders={}, requestedPath=""):
+    global STATUSCODE, imageFileExtensions, filePath, Response
+    response = ""
+    fileExtension = "html"
+    try:
+        if os.path.isfile(filePath + requestedPath):
+            fileExtension = requestedPath.split(".")[-1]
+    except:
+        pass
+    Response["Date"] = httpDateFormat()
+    Response["Content-Type"] = switchContentType(fileExtension)
+    STATUSCODE = 200
+    if isBadRequest(httpVersion, restHeaders):
+        STATUSCODE = 400
+        httpVersion = "HTTP/1.1"
+        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+        Response["Content-Length"] = str(os.path.getsize(filePath + "/bad_request.html"))
+    elif requestedPath.endswith(tuple(imageFileExtensions)):
+        path = getValidFilePath(requestedPath)
+        if path.endswith(('not_found.html')):
+            STATUSCODE = 404
+        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+        Response["Content-Length"] = str(os.path.getsize(path))
+    else:
+        path = getValidFilePath(requestedPath)
+        if path.endswith(('not_found.html')):
+            STATUSCODE = 404
+        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+        Response["Content-Length"] = str(os.path.getsize(path))
+    for key, value in Response.items():
+        response += key + ": " + value + "\r\n"
+    response += "\r\n"
+    response = response.encode()
+    print(response)
     return response
 
 
@@ -286,8 +322,8 @@ def eachClientThread(clientConnection=None):
             #     pass
             # elif requestedMethod == "DELETE":
             #     pass
-            # elif requestedMethod == "HEAD":
-            #     pass
+            elif requestedMethod == "HEAD":
+                response = handleHEADRequest(httpVersion, restHeaders, requestedPath)
             clientConnection.send(response)
             # try:
             #     totalClientConnections.remove(clientConnection)
