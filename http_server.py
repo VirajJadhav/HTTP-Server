@@ -35,6 +35,8 @@ def switchContentType(contentType=None):
     contentTable = {
         "txt": "text/plain",
         "html": "text/html",
+        "php": "text/html",
+        "pdf": "application/pdf",
         "csv": "text/csv",
         "apng": "image/apng",
         "bmp": "image/bmp",
@@ -82,7 +84,6 @@ def parseRequestValueData(value=None):
 def getParsedData(connectionData=None):
     # print("CONNECTION DATA: ", connectionData)
     parsedData = connectionData.split("\r\n")
-    # print(parsedData)
     headerEndCount = 0
     requestedMethod = None
     requestedPath = ""
@@ -106,7 +107,7 @@ def getParsedData(connectionData=None):
             break
     if requestedMethod == "GET":
         pass
-    elif requestedMethod == "POST" and requestedPath.endswith(('book')):
+    elif requestedMethod == "POST" and requestedPath.endswith(('post')):
         if "application/x-www-form-urlencoded" in restHeaders["Content-Type"]:
             tempBody = parsedData[headerEndCount + 1].split("&")
             for tbody in tempBody:
@@ -209,56 +210,6 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
             response += key + ": " + value + "\r\n"
         response += "\r\n"
         response = response.encode() + finalFile
-    elif len(splitReqPath) <= 2 and splitReqPath[0].endswith(("book")):
-        params = ""
-        try:
-            params = splitReqPath[1].split("&")
-        except:
-            pass
-        query = {}
-        requestedData = {}
-        if len(params) <= 2 and len(params) > 0:
-            for p in params:
-                try:
-                    key, value = p.split("=")
-                    query[key] = parseRequestValueData(value)
-                except:
-                    pass
-            with open(filePath + "/server_data.json") as dataFile:
-                jsonDataFile = json.load(dataFile)
-            for data in jsonDataFile:
-                try:
-                    if "bookID" in query and "name" not in query and data["bookID"] == int(query["bookID"]):
-                        requestedData = dict(data)
-                        break
-                    elif "name" in query and "bookID" not in query and data["name"] == query["name"]:
-                        requestedData = dict(data)
-                        break
-                    elif "bookID" in query and "name" in query and data["name"] == query["name"] and data["bookID"] == int(query["bookID"]):
-                        requestedData = dict(data)
-                        break
-                except:
-                    pass
-        elif len(params) == 0:
-            with open(filePath + "/server_data.json") as dataFile:
-                jsonDataFile = json.load(dataFile)
-                requestedData = jsonDataFile
-        if not requestedData:
-            STATUSCODE = 404
-            with open(filePath + "/not_found.html", "r") as outputFile:
-                finalFile = outputFile.read()
-                Response["Content-Length"] = str(len(finalFile))
-                Response["Content-Type"] = switchContentType("html")
-        else:
-            STATUSCODE = 200
-            Response["Content-Length"] = str(len(str(requestedData)))
-            Response["Content-Type"] = switchContentType("json")
-            finalFile = json.dumps(requestedData)
-        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-        for key, value in Response.items():
-            response += key + ": " + value + "\r\n"
-        response += "\r\n" + finalFile
-        response = response.encode()
     else:
         STATUSCODE = 200
         finalFile, fileExtension = getRequestedFile(requestedPath, "r")
@@ -279,7 +230,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
     response = ""
     fileExtension = "html"
     Response["Date"] = httpDateFormat()
-    if not requestedPath.endswith(('book')) or isBadRequest(httpVersion, restHeaders):
+    if not requestedPath.endswith(('post')) or isBadRequest(httpVersion, restHeaders):
         STATUSCODE = 400
         httpVersion = "HTTP/1.1"
         with open(filePath + "/bad_request.html", "r") as requestedFile:
@@ -287,43 +238,25 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
         response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
         Response["Content-Type"] = switchContentType(fileExtension)
         Response["Content-Length"] = str(len(finalFile))
-        # Response["Status"] = STATUSCODE
         for key, value in Response.items():
             response += key + ": " + value + "\r\n"
         response += "\r\n" + finalFile
         response = response.encode()
-    elif requestedPath.endswith(('book')):
-        STATUSCODE = 200
-        jsonDataFile = []
-        flag = False
-        bookID = None
+    elif requestedPath.endswith(('post')):
+        STATUSCODE = 201
         if "filename" in requestBody:
-            STATUSCODE = 201
             tName = requestBody["filename"].split(".")
             resultFile = ".".join(tName[0:-1]) + "(Server)." + tName[-1]
             with open("ClientFiles/" + resultFile, "a") as writeFile:
                 writeFile.write(requestBody[requestBody["filename"]])
-        else:
-            with open(filePath + "/server_data.json") as dataFile:
-                jsonDataFile = json.load(dataFile)
-            for data in jsonDataFile:
-                if data["name"] == requestBody["name"]:
-                    flag = True
-                    bookID = data["bookID"]
-                    break
-            if not flag:
-                STATUSCODE = 201
-                requestBody["bookID"] = len(jsonDataFile) + 1
-                Response["Content-Location"] = "/book/" + \
-                    str(requestBody["bookID"])
-                jsonDataFile.append(requestBody)
-                jsonObject = json.dumps(jsonDataFile, indent=4)
-                with open(filePath + "/server_data.json", "w") as outputFile:
-                    outputFile.write(jsonObject)
-            else:
-                Response["Content-Location"] = "/book/" + \
-                    str(bookID)
-                finalFile = "<html><head><title>POST</title></head><body><h1>Data already present</h1></body></html>"
+            del requestBody[requestBody["filename"]]
+        newPostData = "POST Date: " + Response["Date"] + "\n" + "POST DATA:\n"
+        for key, value in requestBody.items():
+            newPostData += "\t" + str(key) + " = " + str(value) + "\n"
+        newPostData += "\n" + "#"*60 + "\n\n"
+        Response["Content-Location"] = "/post"
+        with open(filePath + "/server_data.txt", "a") as outputFile:
+            outputFile.write(newPostData)
         response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
         Response["Content-Type"] = switchContentType(fileExtension)
         Response["Content-Length"] = str(len(finalFile))

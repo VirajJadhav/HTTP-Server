@@ -1,24 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Delta-Server</title>
-    </head>
-    <body>
-        <h1>Welcome !</h1>
-        <form action="/book" method="POST">
-            <label for="name">Book Name:</label><br>
-            <input type="text" id="name" name="name"><br><br />
-            <label for="author">Author Name:</label><br>
-            <input type="text" id="author" name="author"><br><br>
-            <label for="genre">Book Genre:</label><br>
-            <input type="text" id="genre" name="genre"><br><br>
-            <input type="submit" value="Submit">
-        </form> 
-        <!-- <form action="/book" method="POST" enctype="multipart/form-data">
-            <input type="file" name="fileToUpload" id="fileToUpload">
-            <input type="submit" value="Upload Image" name="submit">
-        </form> -->
-    </body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Delta-Server</title>
+  </head>
+  <body>
+    <h1>Welcome !</h1>
+    <form action="/post" method="POST">
+      <label for="name">Book Name:</label><br />
+      <input type="text" id="name" name="name" /><br /><br />
+      <label for="author">Author Name:</label><br />
+      --> <input type="text" id="author" name="author" /><br /><br />
+      <label for="genre">Book Genre:</label><br />
+      <input type="text" id="genre" name="genre" /><br /><br />
+      <input type="submit" value="Submit" />
+    </form>
+    <!-- <form action="/post" method="POST" enctype="multipart/form-data">
+      <input type="file" name="fileToUpload" id="fileToUpload" />
+      <input type="submit" value="Upload Image" name="submit" />
+    </form> -->
+  </body>
 </html>
