@@ -1,0 +1,7 @@
+POST Date: Tue, 27 Oct 2020 18:13:08 GMT
+POST DATA:
+	filename = new.txt
+	submit = Upload Image
+
+############################################################
+
