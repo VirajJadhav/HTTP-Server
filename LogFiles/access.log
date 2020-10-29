@@ -1,0 +1,2 @@
+[Fri, 30 Oct 2020 01:10:20 +0530] "GET / HTTP/1.1" 200 254 "-" "PostmanRuntime/7.26.8"
+[Fri, 30 Oct 2020 01:10:22 +0530] "HEAD / HTTP/1.1" 200 254 "-" "PostmanRuntime/7.26.8"

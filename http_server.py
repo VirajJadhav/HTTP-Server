@@ -1,6 +1,7 @@
 from socket import *
 import threading
 import sys
+from datetime import datetime, timezone
 from email.utils import formatdate
 import os
 import json
@@ -18,7 +19,8 @@ Response = {
     "Date": "",
     "Server": "Delta-Server/0.0.1 (Ubuntu)",
     "Connection": "close",
-    "Content-Language": "en-US"
+    "Content-Language": "en-US",
+    "Last-Modified": ""
     # "Status": STATUSCODE str()
 }
 
@@ -27,6 +29,7 @@ def switchStatusCode(code=None):
     codeTable = {
         200: " 200 OK",
         201: " 201 Created",
+        304: " 304 Not Modified",
         400: " 400 Bad Request",
         404: " 404 Not Found",
         501: " 501 Not Implemented",
@@ -59,6 +62,18 @@ def switchContentType(contentType=None):
 
 def httpDateFormat(Ltime=False):
     return str(formatdate(timeval=None, localtime=Ltime, usegmt=True))
+
+
+def getLastModifiedTime(path=""):
+    lastModified = ""
+    try:
+        msecs = os.path.getmtime(path)
+    except Exception as error:
+        msecs = 0
+        # writeErrorLog("error", error)
+    lastModified = datetime.fromtimestamp(
+        msecs, timezone.utc).strftime("%a, %d %b %Y %H:%M:%S") + " GMT"
+    return lastModified
 
 
 def writeErrorLog(Code="", Error=""):
@@ -98,14 +113,18 @@ def writeAccessLog(requestedMethod="", httpVersion="", requestedPath="", respons
         with open("LogFiles/access.log", "a") as outputFile:
             outputFile.write(log)
     except Exception as error:
-        writeErrorLog("error", error)
+        # writeErrorLog("error", error)
+        pass
 
 
 def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
     global STATUSCODE, Response
-    finalFile = response = ""
+    finalFile = ""
+    response = ""
     fileExtension = "html"
     Response["Date"] = httpDateFormat()
+    if requestedMethod == None:
+        return response, False
     if requestedMethod not in ["GET", "POST", "PUT", "DELETE", "HEAD"]:
         STATUSCODE = 501
         httpVersion = "HTTP/1.1"
@@ -158,12 +177,12 @@ def parseRequestValueData(value=None):
                     tvalue[i][:2])
                 value += bytesData.decode("ASCII") + tvalue[i][2:]
             except Exception as error:
-                writeErrorLog("debug", error)
+                # writeErrorLog("debug", error)
+                pass
     return value
 
 
 def getParsedData(connectionData=None):
-    # print("CONNECTION DATA: ", connectionData)
     parsedData = connectionData.split("\r\n")
     headerEndCount = 0
     requestedMethod = None
@@ -185,7 +204,7 @@ def getParsedData(connectionData=None):
             key, value = data.split(":", 1)
             restHeaders[key] = value
         except Exception as error:
-            writeErrorLog("debug", error)
+            # writeErrorLog("debug", error)
             break
     if requestedMethod == "GET" or requestedMethod == "HEAD":
         pass
@@ -197,7 +216,8 @@ def getParsedData(connectionData=None):
                     key, value = tbody.split("=")
                     requestBody[key] = parseRequestValueData(value)
                 except Exception as error:
-                    writeErrorLog("debug", error)
+                    # writeErrorLog("debug", error)
+                    pass
         elif "text/plain" in restHeaders["Content-Type"]:
             reqBody = parsedData[headerEndCount + 1:]
             for body in reqBody:
@@ -205,7 +225,8 @@ def getParsedData(connectionData=None):
                     key, value = body.split("=")
                     requestBody[key] = value
                 except Exception as error:
-                    writeErrorLog("debug", error)
+                    # writeErrorLog("debug", error)
+                    pass
         elif "multipart/form-data" in restHeaders["Content-Type"]:
             # reqBoundary = restHeaders["Content-Type"].split("boundary=")[1]
             reqBody = parsedData[headerEndCount + 1:]
@@ -222,7 +243,8 @@ def getParsedData(connectionData=None):
                             requestBody[tkey] = str(reqBody[i + 3])
                             requestBody["filename"] = tkey
                     except Exception as error:
-                        writeErrorLog("debug", error)
+                        # writeErrorLog("debug", error)
+                        pass
     return requestedMethod, requestedPath, httpVersion, restHeaders, requestBody
 
 
@@ -243,7 +265,6 @@ def getValidFilePath(requestedPath=""):
 
 def getRequestedFile(requestedPath="", fileMode=""):
     global filePath, STATUSCODE
-    finalFile = ""
     finalExtension = ""
     try:
         if os.path.isfile(filePath + requestedPath):
@@ -251,18 +272,17 @@ def getRequestedFile(requestedPath="", fileMode=""):
         else:
             fileExtension = "html"
     except Exception as error:
-        writeErrorLog("debug", error)
+        # writeErrorLog("debug", error)
+        pass
     try:
-        requestedPath = getValidFilePath(requestedPath)
-        requestedFile = open(requestedPath, fileMode)
+        newRequestedPath = getValidFilePath(requestedPath)
     except Exception as error:
-        writeErrorLog("debug", error)
-    try:
-        with requestedFile:
-            finalFile = requestedFile.read()
-    except Exception as error:
-        writeErrorLog("error", error)
-    return finalFile, fileExtension
+        # writeErrorLog("debug", error)
+        pass
+    lastModified = getLastModifiedTime(newRequestedPath)
+    # print("FILE REPRESENTATIONS BEFORE RETURNING: ",
+    #       newRequestedPath, fileExtension, lastModified)
+    return newRequestedPath, fileExtension, lastModified
 
 
 def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
@@ -272,27 +292,73 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
     responseBodySize = "-"
     Response["Date"] = httpDateFormat()
     STATUSCODE = 200
+    # print("REST HEADERS: ", restHeaders)
     if requestedPath.endswith(tuple(imageFileExtensions)):
-        finalFile, fileExtension = getRequestedFile(requestedPath, "rb")
-        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-        Response["Content-Type"] = switchContentType(fileExtension)
-        Response["Content-Length"] = str(len(finalFile))
-        # Response["Status"] = STATUSCODE
-        for key, value in Response.items():
-            response += key + ": " + value + "\r\n"
-        response += "\r\n"
-        response = response.encode() + finalFile
+        newRequestedPath, fileExtension, lastModified = getRequestedFile(
+            requestedPath, "rb")
+        if STATUSCODE != 404 and "If-Modified-Since" in restHeaders and restHeaders["If-Modified-Since"].lstrip() == lastModified:
+            STATUSCODE = 304
+            response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+            if "Content-Type" in Response:
+                del Response["Content-Type"]
+            if "Content-Length" in Response:
+                del Response["Content-Length"]
+            if "Last-Modified" in Response:
+                del Response["Last-Modified"]
+            for key, value in Response.items():
+                response += str(key) + ": " + str(value) + "\r\n"
+            response = response.encode()
+        else:
+            try:
+                requestedFile = open(newRequestedPath, "rb")
+                with requestedFile:
+                    finalFile = requestedFile.read()
+            except Exception as error:
+                # writeErrorLog("error", error)
+                pass
+            response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+            Response["Content-Type"] = switchContentType(fileExtension)
+            Response["Content-Length"] = str(len(finalFile))
+            Response["Last-Modified"] = lastModified
+            for key, value in Response.items():
+                response += str(key) + ": " + str(value) + "\r\n"
+            response += "\r\n"
+            response = response.encode() + finalFile
     else:
-        finalFile, fileExtension = getRequestedFile(requestedPath, "r")
-        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-        Response["Content-Type"] = switchContentType(fileExtension)
-        Response["Content-Length"] = str(len(finalFile))
-        # Response["Status"] = STATUSCODE
-        for key, value in Response.items():
-            response += key + ": " + value + "\r\n"
-        response += "\r\n" + finalFile
+        newRequestedPath, fileExtension, lastModified = getRequestedFile(
+            requestedPath, "r")
+        if STATUSCODE != 404 and "If-Modified-Since" in restHeaders and restHeaders["If-Modified-Since"].lstrip() == lastModified:
+            STATUSCODE = 304
+            response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+            if "Content-Type" in Response:
+                del Response["Content-Type"]
+            if "Content-Length" in Response:
+                del Response["Content-Length"]
+            if "Last-Modified" in Response:
+                del Response["Last-Modified"]
+            for key, value in Response.items():
+                response += str(key) + ": " + str(value) + "\r\n"
+        else:
+            try:
+                requestedFile = open(newRequestedPath, "r")
+                with requestedFile:
+                    finalFile = requestedFile.read()
+            except Exception as error:
+                # writeErrorLog("error", error)
+                pass
+            response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+            Response["Content-Type"] = switchContentType(fileExtension)
+            Response["Content-Length"] = str(len(finalFile))
+            Response["Last-Modified"] = lastModified
+            for key, value in Response.items():
+                response += str(key) + ": " + str(value) + "\r\n"
+            response += "\r\n" + finalFile
+            responseBodySize = Response["Content-Length"]
+
+        # print("RESPONSE BEFORE ENCODING: ", response)
+
         response = response.encode()
-    responseBodySize = Response["Content-Length"]
+
     writeAccessLog("GET", httpVersion, requestedPath,
                    responseBodySize, restHeaders)
     return response
@@ -314,7 +380,8 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
             with open("ClientFiles/" + resultFile, "a") as writeFile:
                 writeFile.write(requestBody[requestBody["filename"]])
         except Exception as error:
-            writeErrorLog("error", error)
+            # writeErrorLog("error", error)
+            pass
         del requestBody[requestBody["filename"]]
     newPostData = "POST Date: " + Response["Date"] + "\n" + "POST DATA:\n"
     for key, value in requestBody.items():
@@ -325,7 +392,8 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
         with open(filePath + "/server_data.txt", "a") as outputFile:
             outputFile.write(newPostData)
     except Exception as error:
-        writeErrorLog("error", error)
+        # writeErrorLog("error", error)
+        pass
     response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
     Response["Content-Type"] = switchContentType(fileExtension)
     Response["Content-Length"] = str(len(finalFile))
@@ -348,7 +416,8 @@ def handleHEADRequest(httpVersion="", restHeaders={}, requestedPath=""):
         if os.path.isfile(filePath + requestedPath):
             fileExtension = requestedPath.split(".")[-1]
     except Exception as error:
-        writeErrorLog("debug", error)
+        # writeErrorLog("debug", error)
+        pass
     Response["Date"] = httpDateFormat()
     Response["Content-Type"] = switchContentType(fileExtension)
     STATUSCODE = 200
@@ -396,13 +465,15 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
             try:
                 os.makedirs(path)
             except Exception as error:
-                writeErrorLog("error", error)
+                # writeErrorLog("error", error)
+                pass
             path += "/" + sep[-1]
         else:
             try:
                 os.makedirs("/".join(sep))
             except Exception as error:
-                writeErrorLog("error", error)
+                # writeErrorLog("error", error)
+                pass
             path += "/dump.txt"
     if "filename" in requestBody:
         resultFile = requestBody["filename"]
@@ -411,7 +482,8 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
             with open(newPath + resultFile, "a") as writeFile:
                 writeFile.write(requestBody[requestBody["filename"]])
         except Exception as error:
-            writeErrorLog("error", error)
+            # writeErrorLog("error", error)
+            pass
         # fileDataOutput = requestBody[requestBody["filename"]]
         del requestBody[requestBody["filename"]]
     # fileDataOutput += "\n"
@@ -422,7 +494,8 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
         with open(path, "w") as outputFile:
             outputFile.write(fileDataOutput)
     except Exception as error:
-        writeErrorLog("error", error)
+        # writeErrorLog("error", error)
+        pass
     response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
     Response["Content-Type"] = switchContentType(fileExtension)
     Response["Content-Length"] = str(len(finalFile))
@@ -451,7 +524,8 @@ def handleDELETERequest(httpVersion="", restHeaders={}, requestedPath="", reques
         else:
             STATUSCODE = 404
     except Exception as error:
-        writeErrorLog("error", error)
+        # writeErrorLog("error", error)
+        pass
     response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
     Response["Content-Type"] = switchContentType(fileExtension)
     Response["Content-Length"] = str(len(finalFile))
@@ -468,46 +542,41 @@ def handleDELETERequest(httpVersion="", restHeaders={}, requestedPath="", reques
 def eachClientThread(clientConnection=None):
     global totalClientConnections, STATUSCODE
     totalClientConnections.append(clientConnection)
-    while True:
-        try:
-            connectionData = clientConnection.recv(1024).decode('utf-8')
-            requestedMethod, requestedPath, httpVersion, restHeaders, requestBody = getParsedData(
-                connectionData)
-            # response = b'HTTP/1.1 200 OK\r\n'
-            response, isValid = validateRequest(
-                requestedMethod, httpVersion, restHeaders)
-            if isValid:
-                if requestedMethod == "GET":
-                    response = handleGETRequest(
-                        httpVersion, restHeaders, requestedPath)
-                elif requestedMethod == "POST":
-                    response = handlePOSTRequest(
-                        httpVersion, restHeaders, requestedPath, requestBody)
-                elif requestedMethod == "PUT":
-                    response = handlePUTRequest(
-                        httpVersion, restHeaders, requestedPath, requestBody)
-                elif requestedMethod == "DELETE":
-                    response = handleDELETERequest(
-                        httpVersion, restHeaders, requestedPath, requestBody)
-                elif requestedMethod == "HEAD":
-                    response = handleHEADRequest(
-                        httpVersion, restHeaders, requestedPath)
+    try:
+        connectionData = clientConnection.recv(1024).decode('utf-8')
+        # print("Received Connection Data: ", connectionData)
+        requestedMethod, requestedPath, httpVersion, restHeaders, requestBody = getParsedData(
+            connectionData)
+        # response = b'HTTP/1.1 200 OK\r\n'
+        response, isValid = validateRequest(
+            requestedMethod, httpVersion, restHeaders)
+        # print("Response after validation: ", response)
+        if isValid:
+            if requestedMethod == "GET":
+                response = handleGETRequest(
+                    httpVersion, restHeaders, requestedPath)
+            elif requestedMethod == "POST":
+                response = handlePOSTRequest(
+                    httpVersion, restHeaders, requestedPath, requestBody)
+            elif requestedMethod == "PUT":
+                response = handlePUTRequest(
+                    httpVersion, restHeaders, requestedPath, requestBody)
+            elif requestedMethod == "DELETE":
+                response = handleDELETERequest(
+                    httpVersion, restHeaders, requestedPath, requestBody)
+            elif requestedMethod == "HEAD":
+                response = handleHEADRequest(
+                    httpVersion, restHeaders, requestedPath)
 
-            clientConnection.send(response)
-            # try:
-            #     totalClientConnections.remove(clientConnection)
-            #     clientConnection.close()
-            # except:
-            #     break
+        clientConnection.send(response)
+        if clientConnection in totalClientConnections:
+            totalClientConnections.remove(clientConnection)
+        clientConnection.close()
 
-        except Exception as error:
-            writeErrorLog("error", error)
-            try:
-                totalClientConnections.remove(clientConnection)
-                clientConnection.close()
-            except Exception as error:
-                writeErrorLog("error", error)
-            break
+    except Exception as error:
+        # writeErrorLog("error", error)
+        # break
+        pass
 
 
 def startServer(serverSocket=None):
