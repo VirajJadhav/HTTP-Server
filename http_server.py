@@ -57,7 +57,7 @@ def switchContentType(contentType=None):
         "json": "application/json",
         "js": "application/javascript"
     }
-    return contentTable.get(contentType, "image/") + "; charset=utf-8"
+    return contentTable.get(contentType, "image/") + "; charset=ISO-8859-1"
 
 
 def httpDateFormat(Ltime=False):
@@ -182,8 +182,10 @@ def parseRequestValueData(value=None):
     return value
 
 
-def getParsedData(connectionData=None):
+def getParsedData(connectionData=None, clientConnection=None):
+    global imageFileExtensions
     parsedData = connectionData.split("\r\n")
+    # print(connectionData)
     headerEndCount = 0
     requestedMethod = None
     requestedPath = ""
@@ -209,6 +211,20 @@ def getParsedData(connectionData=None):
     if requestedMethod == "GET" or requestedMethod == "HEAD":
         pass
     elif requestedMethod == "POST" or requestedMethod == "PUT":
+        actualLength = int(restHeaders["Content-Length"].strip())
+        if actualLength > 1024:
+            extraData = abs(actualLength - int(len(connectionData)))
+            try:
+                while extraData > 0:
+                    extraConnectionData = clientConnection.recv(
+                        1024).decode('ISO-8859-1')
+                    connectionData = str(connectionData) + \
+                        str(extraConnectionData)
+                    extraData -= int(len(extraConnectionData))
+            except Exception as error:
+                # writeErrorLog("debug", error)
+                pass
+            parsedData = list(connectionData.split("\r\n"))
         if "application/x-www-form-urlencoded" in restHeaders["Content-Type"]:
             tempBody = parsedData[headerEndCount + 1].split("&")
             for tbody in tempBody:
@@ -241,6 +257,9 @@ def getParsedData(connectionData=None):
                         elif len(tbody) == 3:
                             tkey = tbody[2].split("filename=")[1].strip("\"")
                             requestBody[tkey] = str(reqBody[i + 3])
+                            if str(tkey).endswith(tuple(imageFileExtensions)):
+                                requestBody[tkey] += "\r\n" + \
+                                    str(reqBody[i + 4])
                             requestBody["filename"] = tkey
                     except Exception as error:
                         # writeErrorLog("debug", error)
@@ -365,7 +384,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
 
 
 def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBody={}):
-    global Response, STATUSCODE, filePath
+    global Response, STATUSCODE, filePath, imageFileExtensions
     finalFile = "<!DOCTYPE html><html><head><title>POST</title></head><body><h1>POST Success</h1></body></html>"
     response = ""
     fileExtension = "html"
@@ -377,12 +396,18 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
         resultFile = requestBody["filename"]
         # resultFile = ".".join(tName[0:-1]) + "(Server)." + tName[-1]
         try:
-            with open("ClientFiles/" + resultFile, "a") as writeFile:
-                writeFile.write(requestBody[requestBody["filename"]])
+            fileMode = "a"
+            fileContent = requestBody[requestBody["filename"]]
+            if str(requestBody["filename"]).endswith(tuple(imageFileExtensions)):
+                fileMode = "wb"
+                fileContent = fileContent.encode('ISO-8859-1')
+            with open("ClientFiles/" + resultFile, fileMode) as writeFile:
+                writeFile.write(fileContent)
         except Exception as error:
             # writeErrorLog("error", error)
             pass
-        del requestBody[requestBody["filename"]]
+        if requestBody["filename"] in requestBody:
+            del requestBody[requestBody["filename"]]
     newPostData = "POST Date: " + Response["Date"] + "\n" + "POST DATA:\n"
     for key, value in requestBody.items():
         newPostData += "\t" + str(key) + " = " + str(value) + "\n"
@@ -444,7 +469,7 @@ def handleHEADRequest(httpVersion="", restHeaders={}, requestedPath=""):
 
 
 def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBody={}):
-    global Response, STATUSCODE
+    global Response, STATUSCODE, imageFileExtensions
     finalFile = "<!DOCTYPE html><html><head><title>PUT</title></head><body><h1>PUT Success</h1></body></html>"
     response = ""
     fileExtension = "html"
@@ -479,13 +504,20 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
         resultFile = requestBody["filename"]
         newPath = "/".join(path.rsplit("/", 1)) + "/"
         try:
-            with open(newPath + resultFile, "a") as writeFile:
-                writeFile.write(requestBody[requestBody["filename"]])
+            fileMode = "a"
+            fileContent = requestBody[requestBody["filename"]]
+            if str(requestBody["filename"]).endswith(tuple(imageFileExtensions)):
+                fileMode = "wb"
+                fileContent = fileContent.encode('ISO-8859-1')
+            with open(newPath + resultFile, fileMode) as writeFile:
+                writeFile.write(fileContent)
         except Exception as error:
             # writeErrorLog("error", error)
             pass
+
         # fileDataOutput = requestBody[requestBody["filename"]]
-        del requestBody[requestBody["filename"]]
+        if requestBody["filename"] in requestBody:
+            del requestBody[requestBody["filename"]]
     # fileDataOutput += "\n"
     for key, value in requestBody.items():
         fileDataOutput += str(key) + " = " + str(value) + "\n"
@@ -543,10 +575,10 @@ def eachClientThread(clientConnection=None):
     global totalClientConnections, STATUSCODE
     totalClientConnections.append(clientConnection)
     try:
-        connectionData = clientConnection.recv(1024).decode('utf-8')
+        connectionData = clientConnection.recv(1024).decode('ISO-8859-1')
         # print("Received Connection Data: ", connectionData)
         requestedMethod, requestedPath, httpVersion, restHeaders, requestBody = getParsedData(
-            connectionData)
+            connectionData, clientConnection)
         # response = b'HTTP/1.1 200 OK\r\n'
         response, isValid = validateRequest(
             requestedMethod, httpVersion, restHeaders)
