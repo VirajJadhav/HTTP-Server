@@ -1,17 +1,16 @@
 from socket import *
 import threading
-import sys
 from datetime import datetime, timezone
 from email.utils import formatdate
+import sys
 import os
-import json
+from configparser import ConfigParser
 # import shutil
 
-# default port
-PORT = 4000
+
+CONFIG = None
+
 totalClientConnections = []
-# filePath = "/home/viraj007/Semester 5/CN/Project/final/ResponseFiles/"
-filePath = "ResponseFiles"
 STATUSCODE = None
 imageFileExtensions = [".png", ".jpeg", ".jpg",
                        ".ico", ".webp", ".apng", ".gif", ".bmp", ".svg"]
@@ -57,7 +56,7 @@ def switchContentType(contentType=None):
         "json": "application/json",
         "js": "application/javascript"
     }
-    return contentTable.get(contentType, "image/") + "; charset=ISO-8859-1"
+    return contentTable.get(contentType, "text/plain") + "; charset=ISO-8859-1"
 
 
 def httpDateFormat(Ltime=False):
@@ -251,8 +250,7 @@ def getParsedData(connectionData=None, clientConnection=None):
                     try:
                         tbody = reqBody[i].split(";")
                         if len(tbody) == 2:
-                            tkey = tbody[1].split("name=")[
-                                1].strip("\"")
+                            tkey = tbody[1].split("name=")[1].strip("\"")
                             requestBody[tkey] = reqBody[i + 2]
                         elif len(tbody) == 3:
                             tkey = tbody[2].split("filename=")[1].strip("\"")
@@ -268,25 +266,25 @@ def getParsedData(connectionData=None, clientConnection=None):
 
 
 def getValidFilePath(requestedPath=""):
-    global filePath, STATUSCODE
+    global STATUSCODE, CONFIG
     requestedPath = str(requestedPath)
-    if os.path.isdir(filePath + requestedPath):
+    if os.path.isdir(CONFIG['PATH']['RootDirectory'] + requestedPath):
         if requestedPath.endswith(('/')):
-            return filePath + requestedPath + "index.html"
+            return CONFIG['PATH']['RootDirectory'] + requestedPath + "index.html"
         else:
-            return filePath + requestedPath + "/index.html"
-    elif os.path.isfile(filePath + requestedPath):
-        return filePath + requestedPath
+            return CONFIG['PATH']['RootDirectory'] + requestedPath + "/index.html"
+    elif os.path.isfile(CONFIG['PATH']['RootDirectory'] + requestedPath):
+        return CONFIG['PATH']['RootDirectory'] + requestedPath
     else:
         STATUSCODE = 404
-        return filePath + "/not_found.html"
+        return CONFIG['PATH']['RootDirectory'] + "/not_found.html"
 
 
 def getRequestedFile(requestedPath="", fileMode=""):
-    global filePath, STATUSCODE
+    global STATUSCODE, CONFIG
     finalExtension = ""
     try:
-        if os.path.isfile(filePath + requestedPath):
+        if os.path.isfile(CONFIG['PATH']['RootDirectory'] + requestedPath):
             fileExtension = requestedPath.split(".")[-1]
         else:
             fileExtension = "html"
@@ -305,7 +303,7 @@ def getRequestedFile(requestedPath="", fileMode=""):
 
 
 def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
-    global STATUSCODE, imageFileExtensions, filePath, Response
+    global STATUSCODE, imageFileExtensions, Response
     finalFile = response = ""
     fileExtension = "html"
     responseBodySize = "-"
@@ -384,7 +382,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
 
 
 def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBody={}):
-    global Response, STATUSCODE, filePath, imageFileExtensions
+    global Response, STATUSCODE, CONFIG, imageFileExtensions
     finalFile = "<!DOCTYPE html><html><head><title>POST</title></head><body><h1>POST Success</h1></body></html>"
     response = ""
     fileExtension = "html"
@@ -414,7 +412,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
     newPostData += "\n" + "#"*60 + "\n\n"
     # Response["Content-Location"] = requestedPath
     try:
-        with open(filePath + "/server_data.txt", "a") as outputFile:
+        with open(CONFIG['PATH']['RootDirectory'] + "/server_data.txt", "a") as outputFile:
             outputFile.write(newPostData)
     except Exception as error:
         # writeErrorLog("error", error)
@@ -433,12 +431,12 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
 
 
 def handleHEADRequest(httpVersion="", restHeaders={}, requestedPath=""):
-    global STATUSCODE, imageFileExtensions, filePath, Response
+    global STATUSCODE, imageFileExtensions, Response, CONFIG
     response = ""
     fileExtension = "html"
     responseBodySize = "-"
     try:
-        if os.path.isfile(filePath + requestedPath):
+        if os.path.isfile(CONFIG['PATH']['RootDirectory'] + requestedPath):
             fileExtension = requestedPath.split(".")[-1]
     except Exception as error:
         # writeErrorLog("debug", error)
@@ -619,19 +617,49 @@ def startServer(serverSocket=None):
         forEachConnection.start()
 
 
-def establishConnection(argv=[]):
-    global PORT
+def establishConnection():
+    global CONFIG
     serverSocket = socket(AF_INET, SOCK_STREAM)
     try:
-        serverPort = int(argv[1])
-    except:
-        serverPort = PORT
+        serverPort = int(CONFIG.get("DEFAULT", "PORT"))
+    except Exception as error:
+        print(error, 'of config file.')
+        print("Please specify a valid listen port in default section of config file.")
+        # writeErrorLog("error", error)
+        sys.exit(1)
+    serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     serverSocket.bind(('', serverPort))
     serverSocket.listen()
     return serverSocket
 
 
+def clearInvalidLog():
+    global CONFIG
+    try:
+        accessPath = CONFIG['LOG']['Access']
+        errorPath = CONFIG['LOG']['Error']
+        if(os.path.isfile(accessPath) and os.path.getsize(accessPath) > 10000):
+            os.unlink(accessPath)
+        if(os.path.isfile(errorPath) and os.path.getsize(errorPath) > 10000):
+            os.unlink(errorPath)
+    except Exception as error:
+        # writeErrorLog("error", error)
+        pass
+
+
+def readConfig():
+    global CONFIG
+    CONFIG = ConfigParser()
+    try:
+        CONFIG.read('ConfigFiles/config.ini')
+        clearInvalidLog()
+    except Exception as error:
+        # writeErrorLog("error", error)
+        pass
+
+
 if __name__ == "__main__":
-    serverSocket = establishConnection(sys.argv)
+    readConfig()
+    serverSocket = establishConnection()
     print("The Server is ready to receive requests")
     startServer(serverSocket)
