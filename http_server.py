@@ -5,7 +5,7 @@ from email.utils import formatdate
 import sys
 import os
 from configparser import ConfigParser
-# import shutil
+import shutil
 
 
 CONFIG = None
@@ -132,7 +132,7 @@ def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
         Response["Content-Length"] = "0"
         for key, value in Response.items():
             response += key + ": " + value + "\r\n"
-        response = response.encode()
+        response = response.encode('ISO-8859-1')
         return response, False
     elif httpVersion != "HTTP/1.1":
         STATUSCODE = 505
@@ -144,7 +144,7 @@ def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
             response += key + ": " + value + "\r\n"
         if requestedMethod != "HEAD":
             response += "\r\n" + finalFile
-        response = response.encode()
+        response = response.encode('ISO-8859-1')
         return response, False
     elif "Host" not in restHeaders:
         STATUSCODE = 400
@@ -156,7 +156,7 @@ def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
             response += key + ": " + value + "\r\n"
         if requestedMethod != "HEAD":
             response += "\r\n" + finalFile
-        response = response.encode()
+        response = response.encode('ISO-8859-1')
         return response, False
     return response, True
 
@@ -184,7 +184,7 @@ def parseRequestValueData(value=None):
 def getParsedData(connectionData=None, clientConnection=None):
     global imageFileExtensions
     parsedData = connectionData.split("\r\n")
-    # print(connectionData)
+    # print(parsedData)
     headerEndCount = 0
     requestedMethod = None
     requestedPath = ""
@@ -211,7 +211,7 @@ def getParsedData(connectionData=None, clientConnection=None):
         pass
     elif requestedMethod == "POST" or requestedMethod == "PUT":
         actualLength = int(restHeaders["Content-Length"].strip())
-        if actualLength > 1024:
+        if actualLength > 1024 or parsedData[-1] != "":
             extraData = abs(actualLength - int(len(connectionData)))
             try:
                 while extraData > 0:
@@ -268,23 +268,28 @@ def getParsedData(connectionData=None, clientConnection=None):
 def getValidFilePath(requestedPath=""):
     global STATUSCODE, CONFIG
     requestedPath = str(requestedPath)
-    if os.path.isdir(CONFIG['PATH']['RootDirectory'] + requestedPath):
-        if requestedPath.endswith(('/')):
-            return CONFIG['PATH']['RootDirectory'] + requestedPath + "index.html"
-        else:
-            return CONFIG['PATH']['RootDirectory'] + requestedPath + "/index.html"
-    elif os.path.isfile(CONFIG['PATH']['RootDirectory'] + requestedPath):
-        return CONFIG['PATH']['RootDirectory'] + requestedPath
-    else:
+    if 'DocumentRoot' not in CONFIG['PATH']:
+        # Need to modify later
         STATUSCODE = 404
-        return CONFIG['PATH']['RootDirectory'] + "/not_found.html"
+        return 'ResponseFiles/not_found.html'
+    else:
+        if os.path.isdir(CONFIG['PATH']['DocumentRoot'] + requestedPath):
+            if requestedPath.endswith(('/')):
+                return CONFIG['PATH']['DocumentRoot'] + requestedPath + "index.html"
+            else:
+                return CONFIG['PATH']['DocumentRoot'] + requestedPath + "/index.html"
+        elif os.path.isfile(CONFIG['PATH']['DocumentRoot'] + requestedPath):
+            return CONFIG['PATH']['DocumentRoot'] + requestedPath
+        else:
+            STATUSCODE = 404
+            return CONFIG['PATH']['DocumentRoot'] + "/not_found.html"
 
 
 def getRequestedFile(requestedPath="", fileMode=""):
     global STATUSCODE, CONFIG
     finalExtension = ""
     try:
-        if os.path.isfile(CONFIG['PATH']['RootDirectory'] + requestedPath):
+        if os.path.isfile(CONFIG['PATH']['DocumentRoot'] + requestedPath):
             fileExtension = requestedPath.split(".")[-1]
         else:
             fileExtension = "html"
@@ -324,7 +329,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
                 del Response["Last-Modified"]
             for key, value in Response.items():
                 response += str(key) + ": " + str(value) + "\r\n"
-            response = response.encode()
+            response = response.encode('ISO-8859-1')
         else:
             try:
                 requestedFile = open(newRequestedPath, "rb")
@@ -340,7 +345,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
             for key, value in Response.items():
                 response += str(key) + ": " + str(value) + "\r\n"
             response += "\r\n"
-            response = response.encode() + finalFile
+            response = response.encode('ISO-8859-1') + finalFile
     else:
         newRequestedPath, fileExtension, lastModified = getRequestedFile(
             requestedPath, "r")
@@ -374,7 +379,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
 
         # print("RESPONSE BEFORE ENCODING: ", response)
 
-        response = response.encode()
+        response = response.encode('ISO-8859-1')
 
     writeAccessLog("GET", httpVersion, requestedPath,
                    responseBodySize, restHeaders)
@@ -412,7 +417,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
     newPostData += "\n" + "#"*60 + "\n\n"
     # Response["Content-Location"] = requestedPath
     try:
-        with open(CONFIG['PATH']['RootDirectory'] + "/server_data.txt", "a") as outputFile:
+        with open(CONFIG['PATH']['DocumentRoot'] + "/server_data.txt", "a") as outputFile:
             outputFile.write(newPostData)
     except Exception as error:
         # writeErrorLog("error", error)
@@ -423,7 +428,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
     for key, value in Response.items():
         response += key + ": " + value + "\r\n"
     response += "\r\n" + finalFile
-    response = response.encode()
+    response = response.encode('ISO-8859-1')
     responseBodySize = Response["Content-Length"]
     writeAccessLog("POST", httpVersion, requestedPath,
                    responseBodySize, restHeaders)
@@ -436,7 +441,7 @@ def handleHEADRequest(httpVersion="", restHeaders={}, requestedPath=""):
     fileExtension = "html"
     responseBodySize = "-"
     try:
-        if os.path.isfile(CONFIG['PATH']['RootDirectory'] + requestedPath):
+        if os.path.isfile(CONFIG['PATH']['DocumentRoot'] + requestedPath):
             fileExtension = requestedPath.split(".")[-1]
     except Exception as error:
         # writeErrorLog("debug", error)
@@ -459,7 +464,7 @@ def handleHEADRequest(httpVersion="", restHeaders={}, requestedPath=""):
     for key, value in Response.items():
         response += key + ": " + value + "\r\n"
     response += "\r\n"
-    response = response.encode()
+    response = response.encode('ISO-8859-1')
     responseBodySize = Response["Content-Length"]
     writeAccessLog("HEAD", httpVersion, requestedPath,
                    responseBodySize, restHeaders)
@@ -532,7 +537,7 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
     for key, value in Response.items():
         response += key + ": " + value + "\r\n"
     response += "\r\n" + finalFile
-    response = response.encode()
+    response = response.encode('ISO-8859-1')
     responseBodySize = Response["Content-Length"]
     writeAccessLog("PUT", httpVersion, requestedPath,
                    responseBodySize, restHeaders)
@@ -549,8 +554,8 @@ def handleDELETERequest(httpVersion="", restHeaders={}, requestedPath="", reques
         if os.path.isfile(requestedPath[1:]) or os.path.islink(requestedPath[1:]):
             STATUSCODE = 200
             os.unlink(requestedPath[1:])
-        # elif os.path.isdir(requestedPath):
-        #     shutil.rmtree(requestedPath)
+        elif os.path.isdir(requestedPath):
+            shutil.rmtree(requestedPath)
         else:
             STATUSCODE = 404
     except Exception as error:
@@ -562,7 +567,7 @@ def handleDELETERequest(httpVersion="", restHeaders={}, requestedPath="", reques
     for key, value in Response.items():
         response += key + ": " + value + "\r\n"
     response += "\r\n" + finalFile
-    response = response.encode()
+    response = response.encode('ISO-8859-1')
     responseBodySize = Response["Content-Length"]
     writeAccessLog("DELETE", httpVersion, requestedPath,
                    responseBodySize, restHeaders)
@@ -627,9 +632,13 @@ def establishConnection():
         print("Please specify a valid listen port in default section of config file.")
         # writeErrorLog("error", error)
         sys.exit(1)
-    serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-    serverSocket.bind(('', serverPort))
-    serverSocket.listen()
+    try:
+        serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        serverSocket.bind(('', serverPort))
+        serverSocket.listen()
+    except Exception as error:
+        writeErrorLog("error", error)
+        pass
     return serverSocket
 
 
