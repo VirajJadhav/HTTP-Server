@@ -1,36 +1,11 @@
 from socket import *
 import threading
 import sys
+import time
 from configparser import ConfigParser
 
 
 CONFIG = None
-
-
-def listenServer(clientSocket=None):
-    # while True:
-    try:
-        response = clientSocket.recv(1024)
-        print(response.decode('ISO-8859-1'))
-        # clientSocket.close()
-        # break
-    except Exception as error:
-        print(error)
-        pass
-
-
-def startClient(clientSocket=None, testCases=None):
-    for case in testCases:
-        validCase = case.strip("\n")
-        print(validCase)
-        validCase = "\r\n".join(case.split("\n"))
-        # print(validCase.encode('ISO-8859-1'))
-        try:
-            clientSocket.send(validCase.encode('ISO-8859-1'))
-            # break
-        except Exception as error:
-            print(error)
-        # break
 
 
 def establishConnection():
@@ -69,13 +44,47 @@ def readTestFile():
     return testCases
 
 
+def listenServer(clientSocket=None):
+    try:
+        response = clientSocket.recv(1024).decode('ISO-8859-1')
+        # print(response)
+        # print("#"*30)
+        # clientSocket.close()
+        # break
+    except Exception as error:
+        print(error)
+        pass
+
+
+def startClient(clientSocket=None, case=None):
+    validCase = case.lstrip("\n")
+    validCase = "\r\n".join(validCase.split("\n"))
+    try:
+        clientSocket.send(validCase.encode('ISO-8859-1'))
+        # break
+    except Exception as error:
+        print(error)
+        # break
+
+
+def startTesting(testCases=[]):
+    for case in testCases:
+        if case == '':
+            continue
+        clientSocket = establishConnection()
+        keepListening = threading.Thread(
+            target=listenServer, args=(clientSocket, ))
+        keepListening.start()
+        startRequest = threading.Thread(
+            target=startClient, args=(clientSocket, case, ))
+        startRequest.start()
+        # clientSocket.close()
+
+
 if __name__ == "__main__":
     readConfig()
     testCases = readTestFile()
-    clientSocket = establishConnection()
-    keepListening = threading.Thread(
-        target=listenServer, args=(clientSocket, ))
-    keepListening.start()
-    startRequest = threading.Thread(
-        target=startClient, args=(clientSocket, testCases, ))
-    startRequest.start()
+    start = time.time()
+    startTesting(testCases)
+    end = time.time()
+    print(f"Took {end - start} seconds")

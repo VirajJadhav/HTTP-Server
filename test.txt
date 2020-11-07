@@ -1,11 +1,10 @@
-GET / HTTP/1.1
+DELETE /ClientFiles/new.txt HTTP/1.1
+User-Agent: PostmanRuntime/7.26.8
+Accept: */*
+Postman-Token: 4556bfce-9f79-410e-ae95-69fe0f183cda
 Host: localhost:2000
-User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:82.0) Gecko/20100101 Firefox/82.0
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
-Accept-Language: en-US,en;q=0.5
-Accept-Encoding: gzip, deflate
+Accept-Encoding: gzip, deflate, br
 Connection: keep-alive
-Upgrade-Insecure-Requests: 1
 ##############################
 GET / HTTP/1.1
 Host: localhost:2000
@@ -15,4 +14,60 @@ Accept-Language: en-US,en;q=0.5
 Accept-Encoding: gzip, deflate
 Connection: keep-alive
 Upgrade-Insecure-Requests: 1
+##############################
+GET /form.html HTTP/1.1
+Host: localhost:2000
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:82.0) Gecko/20100101 Firefox/82.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Pragma: no-cache
+Cache-Control: no-cache
+##############################
+POST / HTTP/1.1
+Host: localhost:2000
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:82.0) Gecko/20100101 Firefox/82.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-Type: multipart/form-data; boundary=---------------------------1172260696835512243478171821
+Content-Length: 361
+Origin: http://localhost:2000
+Connection: keep-alive
+Referer: http://localhost:2000/form.html
+Upgrade-Insecure-Requests: 1
+
+-----------------------------1172260696835512243478171821
+Content-Disposition: form-data; name="fileToUpload"; filename="new.txt"
+Content-Type: text/plain
+
+New testing file
+
+-----------------------------1172260696835512243478171821
+Content-Disposition: form-data; name="submit"
+
+Upload File
+-----------------------------1172260696835512243478171821--
+##############################
+HEAD /form.html HTTP/1.1
+User-Agent: PostmanRuntime/7.26.8
+Accept: */*
+Postman-Token: 2c350ff9-a652-4587-9098-26859f9e05e9
+Host: localhost:2000
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+##############################
+PUT /ClientFiles/new.txt HTTP/1.1
+User-Agent: PostmanRuntime/7.26.8
+Accept: */*
+Postman-Token: f08179c5-d725-48c8-a899-02e829d89a06
+Host: localhost:2000
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 49
+
+name=Viraj%20Jadhav&MIS=111803057&Branch=Computer
 ##############################

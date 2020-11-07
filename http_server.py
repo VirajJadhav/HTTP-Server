@@ -10,8 +10,10 @@ import shutil
 
 CONFIG = None
 
-totalClientConnections = []
+CLIENTIP = None
+
 STATUSCODE = None
+
 imageFileExtensions = [".png", ".jpeg", ".jpg",
                        ".ico", ".webp", ".apng", ".gif", ".bmp", ".svg"]
 Response = {
@@ -76,12 +78,15 @@ def getLastModifiedTime(path=""):
 
 
 def writeErrorLog(Code="", Error=""):
+    global CLIENTIP
     date = httpDateFormat(True)
     pid = str(os.getpid())
     tid = str(threading.current_thread().ident)
     log = "[" + date + "]" + " "
     log += "[core: " + Code + "]" + " "
     log += "[pid " + pid + ":tid " + tid + "]" + " "
+    if CLIENTIP != None:
+        log += "[client " + CLIENTIP + "]" + " "
     log += str(Error) + "\n"
     try:
         with open("LogFiles/error.log", "a") as outputFile:
@@ -92,9 +97,13 @@ def writeErrorLog(Code="", Error=""):
 
 
 def writeAccessLog(requestedMethod="", httpVersion="", requestedPath="", responseBodySize="-", restHeaders={}):
-    global STATUSCODE
+    global STATUSCODE, CLIENTIP
     date = httpDateFormat(True)
-    log = "[" + date + "]" + " "
+    if CLIENTIP != None:
+        log = CLIENTIP + " "
+    else:
+        log = "- "
+    log += "[" + date + "]" + " "
     log += "\"" + requestedMethod + " " + \
         requestedPath + " " + httpVersion + "\"" + " "
     log += str(STATUSCODE) + " "
@@ -146,7 +155,7 @@ def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
             response += "\r\n" + finalFile
         response = response.encode('ISO-8859-1')
         return response, False
-    elif "Host" not in restHeaders:
+    elif "Host" not in restHeaders or (requestedMethod in ["POST", "PUT"] and "Content-Length" not in restHeaders):
         STATUSCODE = 400
         finalFile = "<!DOCTYPE html><html><head><title>Delta-Server</title></head><body><h1>400</h1><h2>Server received a Bad Request</h2></body></html>"
         response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
@@ -211,8 +220,11 @@ def getParsedData(connectionData=None, clientConnection=None):
         pass
     elif requestedMethod == "POST" or requestedMethod == "PUT":
         actualLength = int(restHeaders["Content-Length"].strip())
-        if actualLength > 1024 or parsedData[-1] != "":
-            extraData = abs(actualLength - int(len(connectionData)))
+        receivedBody = connectionData.split("\r\n\r\n")[1:]
+        lengthReceivedBody = int(len("\r\n\r\n".join(receivedBody)))
+        if actualLength > 1024 or (actualLength - lengthReceivedBody) > 0:
+            extraData = actualLength - lengthReceivedBody
+            # extraData = abs(actualLength - int(len(connectionData)))
             try:
                 while extraData > 0:
                     extraConnectionData = clientConnection.recv(
@@ -345,6 +357,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
             for key, value in Response.items():
                 response += str(key) + ": " + str(value) + "\r\n"
             response += "\r\n"
+            responseBodySize = Response["Content-Length"]
             response = response.encode('ISO-8859-1') + finalFile
     else:
         newRequestedPath, fileExtension, lastModified = getRequestedFile(
@@ -380,7 +393,6 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
         # print("RESPONSE BEFORE ENCODING: ", response)
 
         response = response.encode('ISO-8859-1')
-
     writeAccessLog("GET", httpVersion, requestedPath,
                    responseBodySize, restHeaders)
     return response
@@ -558,6 +570,7 @@ def handleDELETERequest(httpVersion="", restHeaders={}, requestedPath="", reques
             shutil.rmtree(requestedPath)
         else:
             STATUSCODE = 404
+            finalFile = "<!DOCTYPE html><html><head><title>DELETE</title></head><body><h1>Resource was not present !</h1></body></html>"
     except Exception as error:
         # writeErrorLog("error", error)
         pass
@@ -575,8 +588,8 @@ def handleDELETERequest(httpVersion="", restHeaders={}, requestedPath="", reques
 
 
 def eachClientThread(clientConnection=None):
-    global totalClientConnections, STATUSCODE
-    totalClientConnections.append(clientConnection)
+    global STATUSCODE
+    # totalClientConnections.append(clientConnection)
     try:
         connectionData = clientConnection.recv(1024).decode('ISO-8859-1')
         # print("Received Connection Data: ", connectionData)
@@ -604,8 +617,8 @@ def eachClientThread(clientConnection=None):
                     httpVersion, restHeaders, requestedPath)
 
         clientConnection.send(response)
-        if clientConnection in totalClientConnections:
-            totalClientConnections.remove(clientConnection)
+        # if clientConnection in totalClientConnections:
+        #     totalClientConnections.remove(clientConnection)
         clientConnection.close()
 
     except Exception as error:
@@ -615,8 +628,10 @@ def eachClientThread(clientConnection=None):
 
 
 def startServer(serverSocket=None):
+    global CLIENTIP
     while True:
         clientConnection, addr = serverSocket.accept()
+        CLIENTIP = str(addr[0])
         forEachConnection = threading.Thread(
             target=eachClientThread, args=(clientConnection, ))
         forEachConnection.start()
@@ -636,6 +651,7 @@ def establishConnection():
         serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         serverSocket.bind(('', serverPort))
         serverSocket.listen()
+        # serverSocket.listen(int(CONFIG.get("CONNECTIONS", "Allowed")))
     except Exception as error:
         writeErrorLog("error", error)
         pass
