@@ -4,18 +4,39 @@
 # from concurrent.futures import ThreadPoolExecutor
 # import time
 
-# list_of_url = ["http://localhost:2000"] * 100
+# list_of_url = ["/ClientFiles/new.txt", "/", "/form.html",
+#                "/", "/form.html", "/ClientFiles/new.txt"]
+
+# index = [i for i in range(6)]
 
 
-# def get_url(url):
-#     return requests.get(url)
+# def get_url(url, index):
+#     final = "http://localhost:2000"
+#     if url != "/":
+#         final += url
+#     if index == 0:
+#         return requests.delete(final)
+#     elif index == 1 or index == 2:
+#         return requests.get(final)
+#     elif index == 3:
+#         d = {
+#             'book': "viraj"
+#         }
+#         return requests.post(final, data=d)
+#     elif index == 4:
+#         return requests.head(final)
+#     else:
+#         d = {
+#             'book': "viraj"
+#         }
+#         return requests.put(final, data=d)
 
 
 # start = time.time()
-# with ThreadPoolExecutor(max_workers=4) as pool:
-#     print(len(list(pool.map(get_url, list_of_url))))
+# with ThreadPoolExecutor(max_workers=500) as pool:
+#     print(len(list(pool.map(get_url, list_of_url, index))))
 # end = time.time()
-# print("Took {} seconds to pull {} websites.".format(end - start, 0))
+# print("Took {} seconds.".format(end - start))
 
 
 # websites = "http://localhost:2000\n" * 100

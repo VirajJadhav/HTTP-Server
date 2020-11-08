@@ -41,7 +41,7 @@ def readTestFile():
     with open("test.txt", "r") as testFile:
         testFile = testFile.read()
     testCases = testFile.split("#" * 30)
-    return testCases
+    return testCases * 500
 
 
 def listenServer(clientSocket=None):

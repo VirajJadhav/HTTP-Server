@@ -78,7 +78,7 @@ def getLastModifiedTime(path=""):
 
 
 def writeErrorLog(Code="", Error=""):
-    global CLIENTIP
+    global CLIENTIP, CONFIG
     date = httpDateFormat(True)
     pid = str(os.getpid())
     tid = str(threading.current_thread().ident)
@@ -89,7 +89,9 @@ def writeErrorLog(Code="", Error=""):
         log += "[client " + CLIENTIP + "]" + " "
     log += str(Error) + "\n"
     try:
-        with open("LogFiles/error.log", "a") as outputFile:
+        if not os.path.isdir(CONFIG['LOG']['Directory']):
+            os.mkdir(CONFIG['LOG']['Directory'])
+        with open(CONFIG['LOG']['Error'], "a") as outputFile:
             outputFile.write(log)
     except Exception as e:
         with open("error.log", "a") as outputFile:
@@ -97,7 +99,7 @@ def writeErrorLog(Code="", Error=""):
 
 
 def writeAccessLog(requestedMethod="", httpVersion="", requestedPath="", responseBodySize="-", restHeaders={}):
-    global STATUSCODE, CLIENTIP
+    global STATUSCODE, CLIENTIP, CONFIG
     date = httpDateFormat(True)
     if CLIENTIP != None:
         log = CLIENTIP + " "
@@ -118,7 +120,9 @@ def writeAccessLog(requestedMethod="", httpVersion="", requestedPath="", respons
         log += "\"-\"" + " "
     log += "\n"
     try:
-        with open("LogFiles/access.log", "a") as outputFile:
+        if not os.path.isdir(CONFIG['LOG']['Directory']):
+            os.mkdir(CONFIG['LOG']['Directory'])
+        with open(CONFIG['LOG']['Access'], "a") as outputFile:
             outputFile.write(log)
     except Exception as error:
         # writeErrorLog("error", error)
@@ -399,7 +403,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
 
 
 def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBody={}):
-    global Response, STATUSCODE, CONFIG, imageFileExtensions
+    global Response, STATUSCODE, imageFileExtensions, CONFIG
     finalFile = "<!DOCTYPE html><html><head><title>POST</title></head><body><h1>POST Success</h1></body></html>"
     response = ""
     fileExtension = "html"
@@ -416,7 +420,9 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
             if str(requestBody["filename"]).endswith(tuple(imageFileExtensions)):
                 fileMode = "wb"
                 fileContent = fileContent.encode('ISO-8859-1')
-            with open("ClientFiles/" + resultFile, fileMode) as writeFile:
+            if not os.path.isdir(CONFIG['CLIENT']['Directory']):
+                os.mkdir(CONFIG['CLIENT']['Directory'])
+            with open(CONFIG['CLIENT']['Directory'] + "/" + resultFile, fileMode) as writeFile:
                 writeFile.write(fileContent)
         except Exception as error:
             # writeErrorLog("error", error)
@@ -429,8 +435,13 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
     newPostData += "\n" + "#"*60 + "\n\n"
     # Response["Content-Location"] = requestedPath
     try:
-        with open(CONFIG['PATH']['DocumentRoot'] + "/server_data.txt", "a") as outputFile:
+        if not os.path.isdir(CONFIG['CLIENT']['Directory']):
+            os.mkdir(CONFIG['CLIENT']['Directory'])
+        with open(CONFIG['CLIENT']['POST'], "a") as outputFile:
             outputFile.write(newPostData)
+        # include global CONFIG
+        # with open(CONFIG['PATH']['DocumentRoot'] + "/server_data.txt", "a") as outputFile:
+        #     outputFile.write(newPostData)
     except Exception as error:
         # writeErrorLog("error", error)
         pass
