@@ -41,7 +41,7 @@ def readTestFile():
     with open("test.txt", "r") as testFile:
         testFile = testFile.read()
     testCases = testFile.split("#" * 30)
-    return testCases * 500
+    return testCases
 
 
 def listenServer(clientSocket=None):
@@ -68,17 +68,20 @@ def startClient(clientSocket=None, case=None):
 
 
 def startTesting(testCases=[]):
-    for case in testCases:
-        if case == '':
-            continue
-        clientSocket = establishConnection()
-        keepListening = threading.Thread(
-            target=listenServer, args=(clientSocket, ))
-        keepListening.start()
-        startRequest = threading.Thread(
-            target=startClient, args=(clientSocket, case, ))
-        startRequest.start()
-        # clientSocket.close()
+    try:
+        for case in testCases:
+            if case == '':
+                continue
+            clientSocket = establishConnection()
+            keepListening = threading.Thread(
+                target=listenServer, args=(clientSocket, ))
+            keepListening.start()
+            startRequest = threading.Thread(
+                target=startClient, args=(clientSocket, case, ))
+            startRequest.start()
+            # clientSocket.close()
+    except Exception as error:
+        print(error)
 
 
 if __name__ == "__main__":

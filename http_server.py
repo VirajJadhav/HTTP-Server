@@ -6,6 +6,8 @@ import sys
 import os
 from configparser import ConfigParser
 import shutil
+from uuid import uuid4
+import json
 
 
 CONFIG = None
@@ -32,6 +34,7 @@ def switchStatusCode(code=None):
         201: " 201 Created",
         304: " 304 Not Modified",
         400: " 400 Bad Request",
+        411: " 411 Length Required",
         404: " 404 Not Found",
         501: " 501 Not Implemented",
         505: " 505 HTTP Version Not Supported",
@@ -135,8 +138,8 @@ def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
     response = ""
     fileExtension = "html"
     Response["Date"] = httpDateFormat()
-    if requestedMethod == None:
-        return response, False
+    # if requestedMethod == None:
+    #     return response, False
     if requestedMethod not in ["GET", "POST", "PUT", "DELETE", "HEAD"]:
         STATUSCODE = 501
         httpVersion = "HTTP/1.1"
@@ -159,7 +162,7 @@ def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
             response += "\r\n" + finalFile
         response = response.encode('ISO-8859-1')
         return response, False
-    elif "Host" not in restHeaders or (requestedMethod in ["POST", "PUT"] and "Content-Length" not in restHeaders):
+    elif "Host" not in restHeaders:
         STATUSCODE = 400
         finalFile = "<!DOCTYPE html><html><head><title>Delta-Server</title></head><body><h1>400</h1><h2>Server received a Bad Request</h2></body></html>"
         response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
@@ -169,6 +172,17 @@ def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
             response += key + ": " + value + "\r\n"
         if requestedMethod != "HEAD":
             response += "\r\n" + finalFile
+        response = response.encode('ISO-8859-1')
+        return response, False
+    elif requestedMethod in ["POST", "PUT"] and "Content-Length" not in restHeaders:
+        STATUSCODE = 411
+        finalFile = "<!DOCTYPE html><html><head><title>Delta-Server</title></head><body><h1>411</h1><h2>Server received a request without Content Length</h2></body></html>"
+        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+        Response["Content-Type"] = switchContentType(fileExtension)
+        Response["Content-Length"] = str(len(finalFile))
+        for key, value in Response.items():
+            response += key + ": " + value + "\r\n"
+        response += "\r\n" + finalFile
         response = response.encode('ISO-8859-1')
         return response, False
     return response, True
@@ -323,8 +337,38 @@ def getRequestedFile(requestedPath="", fileMode=""):
     return newRequestedPath, fileExtension, lastModified
 
 
+def setCookie(clientIP=None, restHeaders={}):
+    global CONFIG
+    if "Cookie" in restHeaders:
+        return restHeaders["Cookie"].lstrip() + "; SameSite=Strict"
+    else:
+        cookieFile = CONFIG['COOKIE']['File']
+        if not os.path.isfile(cookieFile):
+            with open(cookieFile, "w") as f:
+                json.dump([], f, indent=4)
+        try:
+            cookieData = []
+            with open(cookieFile) as searchFile:
+                cookieData = json.load(searchFile)
+            for cookie in cookieData:
+                if cookie["clientIP"] == str(clientIP) and "cookie" in cookie:
+                    return "name=" + cookie['cookie'] + "; SameSite=Strict"
+            newCookie = uuid4()
+            newClient = {
+                'clientIP': str(clientIP),
+                'cookie': str(newCookie)
+            }
+            cookieData.append(newClient)
+            with open(cookieFile, "w") as searchFile:
+                json.dump(cookieData, searchFile, indent=4)
+            return "name=" + newClient['cookie'] + "; SameSite=Strict"
+        except Exception as error:
+            # writeErrorLog("debug", error)
+            pass
+
+
 def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
-    global STATUSCODE, imageFileExtensions, Response
+    global STATUSCODE, imageFileExtensions, Response, CLIENTIP
     finalFile = response = ""
     fileExtension = "html"
     responseBodySize = "-"
@@ -343,6 +387,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
                 del Response["Content-Length"]
             if "Last-Modified" in Response:
                 del Response["Last-Modified"]
+            Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
             for key, value in Response.items():
                 response += str(key) + ": " + str(value) + "\r\n"
             response = response.encode('ISO-8859-1')
@@ -358,6 +403,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
             Response["Content-Type"] = switchContentType(fileExtension)
             Response["Content-Length"] = str(len(finalFile))
             Response["Last-Modified"] = lastModified
+            Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
             for key, value in Response.items():
                 response += str(key) + ": " + str(value) + "\r\n"
             response += "\r\n"
@@ -375,6 +421,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
                 del Response["Content-Length"]
             if "Last-Modified" in Response:
                 del Response["Last-Modified"]
+            Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
             for key, value in Response.items():
                 response += str(key) + ": " + str(value) + "\r\n"
         else:
@@ -389,6 +436,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
             Response["Content-Type"] = switchContentType(fileExtension)
             Response["Content-Length"] = str(len(finalFile))
             Response["Last-Modified"] = lastModified
+            Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
             for key, value in Response.items():
                 response += str(key) + ": " + str(value) + "\r\n"
             response += "\r\n" + finalFile
@@ -403,7 +451,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
 
 
 def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBody={}):
-    global Response, STATUSCODE, imageFileExtensions, CONFIG
+    global Response, STATUSCODE, imageFileExtensions, CONFIG, CLIENTIP
     finalFile = "<!DOCTYPE html><html><head><title>POST</title></head><body><h1>POST Success</h1></body></html>"
     response = ""
     fileExtension = "html"
@@ -448,6 +496,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
     response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
     Response["Content-Type"] = switchContentType(fileExtension)
     Response["Content-Length"] = str(len(finalFile))
+    Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
     for key, value in Response.items():
         response += key + ": " + value + "\r\n"
     response += "\r\n" + finalFile
@@ -459,7 +508,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
 
 
 def handleHEADRequest(httpVersion="", restHeaders={}, requestedPath=""):
-    global STATUSCODE, imageFileExtensions, Response, CONFIG
+    global STATUSCODE, imageFileExtensions, Response, CONFIG, CLIENTIP
     response = ""
     fileExtension = "html"
     responseBodySize = "-"
@@ -487,6 +536,7 @@ def handleHEADRequest(httpVersion="", restHeaders={}, requestedPath=""):
     for key, value in Response.items():
         response += key + ": " + value + "\r\n"
     response += "\r\n"
+    Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
     response = response.encode('ISO-8859-1')
     responseBodySize = Response["Content-Length"]
     writeAccessLog("HEAD", httpVersion, requestedPath,
@@ -495,7 +545,7 @@ def handleHEADRequest(httpVersion="", restHeaders={}, requestedPath=""):
 
 
 def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBody={}):
-    global Response, STATUSCODE, imageFileExtensions
+    global Response, STATUSCODE, imageFileExtensions, CLIENTIP
     finalFile = "<!DOCTYPE html><html><head><title>PUT</title></head><body><h1>PUT Success</h1></body></html>"
     response = ""
     fileExtension = "html"
@@ -557,6 +607,7 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
     response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
     Response["Content-Type"] = switchContentType(fileExtension)
     Response["Content-Length"] = str(len(finalFile))
+    Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
     for key, value in Response.items():
         response += key + ": " + value + "\r\n"
     response += "\r\n" + finalFile
@@ -568,7 +619,7 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
 
 
 def handleDELETERequest(httpVersion="", restHeaders={}, requestedPath="", requestBody={}):
-    global Response, STATUSCODE
+    global Response, STATUSCODE, CLIENTIP
     finalFile = "<!DOCTYPE html><html><head><title>DELETE</title></head><body><h1>Resource Deleted !</h1></body></html>"
     response = ""
     fileExtension = "html"
@@ -588,6 +639,7 @@ def handleDELETERequest(httpVersion="", restHeaders={}, requestedPath="", reques
     response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
     Response["Content-Type"] = switchContentType(fileExtension)
     Response["Content-Length"] = str(len(finalFile))
+    Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
     for key, value in Response.items():
         response += key + ": " + value + "\r\n"
     response += "\r\n" + finalFile
@@ -641,11 +693,16 @@ def eachClientThread(clientConnection=None):
 def startServer(serverSocket=None):
     global CLIENTIP
     while True:
-        clientConnection, addr = serverSocket.accept()
-        CLIENTIP = str(addr[0])
-        forEachConnection = threading.Thread(
-            target=eachClientThread, args=(clientConnection, ))
-        forEachConnection.start()
+        try:
+            clientConnection, addr = serverSocket.accept()
+            CLIENTIP = str(addr[0])
+            forEachConnection = threading.Thread(
+                target=eachClientThread, args=(clientConnection, ))
+            forEachConnection.start()
+        except Exception as error:
+            # writeErrorLog("error", error)
+            # break
+            pass
 
 
 def establishConnection():
@@ -687,11 +744,13 @@ def readConfig():
     global CONFIG
     CONFIG = ConfigParser()
     try:
+        if not os.path.isdir('ConfigFiles'):
+            os.mkdir("ConfigFiles")
         CONFIG.read('ConfigFiles/config.ini')
         clearInvalidLog()
     except Exception as error:
-        # writeErrorLog("error", error)
-        pass
+        writeErrorLog("error", error)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
