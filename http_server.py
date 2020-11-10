@@ -23,8 +23,6 @@ Response = {
     "Server": "Delta-Server/0.0.1 (Ubuntu)",
     "Connection": "close",
     "Content-Language": "en-US",
-    "Last-Modified": ""
-    # "Status": STATUSCODE str()
 }
 
 
@@ -34,8 +32,9 @@ def switchStatusCode(code=None):
         201: " 201 Created",
         304: " 304 Not Modified",
         400: " 400 Bad Request",
-        411: " 411 Length Required",
         404: " 404 Not Found",
+        411: " 411 Length Required",
+        415: " 415 Unsupported Media Type",
         501: " 501 Not Implemented",
         505: " 505 HTTP Version Not Supported",
     }
@@ -48,6 +47,7 @@ def switchContentType(contentType=None):
         "html": "text/html",
         "php": "text/html",
         "pdf": "application/pdf",
+        "css": "text/css",
         "csv": "text/csv",
         "apng": "image/apng",
         "bmp": "image/bmp",
@@ -59,7 +59,13 @@ def switchContentType(contentType=None):
         "webp": "image/webp",
         "svg": "image/svg+xml",
         "json": "application/json",
-        "js": "application/javascript"
+        "js": "application/javascript",
+        "bin": "application/octet-stream",
+        "mp3": "audio/mpeg",
+        "wav": "audio/wav",
+        "mpeg": "video/mpeg",
+        "webm": "video/webm",
+        "3gp": "video/3gpp"
     }
     return contentTable.get(contentType, "text/plain") + "; charset=ISO-8859-1"
 
@@ -149,7 +155,7 @@ def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
         for key, value in Response.items():
             response += key + ": " + value + "\r\n"
         response = response.encode('ISO-8859-1')
-        return response, False
+        return response, Response["Content-Length"], False
     elif httpVersion != "HTTP/1.1":
         STATUSCODE = 505
         response = "HTTP/1.1" + switchStatusCode(STATUSCODE) + "\r\n"
@@ -161,8 +167,8 @@ def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
         if requestedMethod != "HEAD":
             response += "\r\n" + finalFile
         response = response.encode('ISO-8859-1')
-        return response, False
-    elif "Host" not in restHeaders:
+        return response, Response["Content-Length"], False
+    elif ("Host" not in restHeaders) or (requestedMethod in ["POST", "PUT"] and "Content-Type" not in restHeaders):
         STATUSCODE = 400
         finalFile = "<!DOCTYPE html><html><head><title>Delta-Server</title></head><body><h1>400</h1><h2>Server received a Bad Request</h2></body></html>"
         response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
@@ -173,19 +179,33 @@ def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
         if requestedMethod != "HEAD":
             response += "\r\n" + finalFile
         response = response.encode('ISO-8859-1')
-        return response, False
-    elif requestedMethod in ["POST", "PUT"] and "Content-Length" not in restHeaders:
-        STATUSCODE = 411
-        finalFile = "<!DOCTYPE html><html><head><title>Delta-Server</title></head><body><h1>411</h1><h2>Server received a request without Content Length</h2></body></html>"
-        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-        Response["Content-Type"] = switchContentType(fileExtension)
-        Response["Content-Length"] = str(len(finalFile))
-        for key, value in Response.items():
-            response += key + ": " + value + "\r\n"
-        response += "\r\n" + finalFile
-        response = response.encode('ISO-8859-1')
-        return response, False
-    return response, True
+        return response, Response["Content-Length"], False
+    elif requestedMethod in ["POST", "PUT"]:
+        if "Content-Length" not in restHeaders:
+            STATUSCODE = 411
+            finalFile = "<!DOCTYPE html><html><head><title>Delta-Server</title></head><body><h1>411</h1><h2>Server received a request without Content Length</h2></body></html>"
+            response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+            Response["Content-Type"] = switchContentType(fileExtension)
+            Response["Content-Length"] = str(len(finalFile))
+            for key, value in Response.items():
+                response += key + ": " + value + "\r\n"
+            response += "\r\n" + finalFile
+            response = response.encode('ISO-8859-1')
+            return response, Response["Content-Length"], False
+        elif "Content-Type" in restHeaders:
+            actualType = restHeaders["Content-Type"].strip().split(";")[0]
+            if actualType not in ["application/x-www-form-urlencoded", "text/plain", "multipart/form-data"]:
+                STATUSCODE = 415
+                finalFile = "<!DOCTYPE html><html><head><title>Delta-Server</title></head><body><h1>415</h1><h2>Server received a request with unsupported media type</h2></body></html>"
+                response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+                Response["Content-Type"] = switchContentType(fileExtension)
+                Response["Content-Length"] = str(len(finalFile))
+                for key, value in Response.items():
+                    response += key + ": " + value + "\r\n"
+                response += "\r\n" + finalFile
+                response = response.encode('ISO-8859-1')
+                return response, Response["Content-Length"], False
+    return response, 0, True
 
 
 def parseRequestValueData(value=None):
@@ -659,7 +679,7 @@ def eachClientThread(clientConnection=None):
         requestedMethod, requestedPath, httpVersion, restHeaders, requestBody = getParsedData(
             connectionData, clientConnection)
         # response = b'HTTP/1.1 200 OK\r\n'
-        response, isValid = validateRequest(
+        response, responseBodySize, isValid = validateRequest(
             requestedMethod, httpVersion, restHeaders)
         # print("Response after validation: ", response)
         if isValid:
@@ -678,6 +698,9 @@ def eachClientThread(clientConnection=None):
             elif requestedMethod == "HEAD":
                 response = handleHEADRequest(
                     httpVersion, restHeaders, requestedPath)
+        else:
+            writeAccessLog(requestedMethod, httpVersion,
+                           requestedPath, responseBodySize, restHeaders)
 
         clientConnection.send(response)
         # if clientConnection in totalClientConnections:
@@ -731,9 +754,9 @@ def clearInvalidLog():
     try:
         accessPath = CONFIG['LOG']['Access']
         errorPath = CONFIG['LOG']['Error']
-        if(os.path.isfile(accessPath) and os.path.getsize(accessPath) > 10000):
+        if(os.path.isfile(accessPath) and os.path.getsize(accessPath) > 100000):
             os.unlink(accessPath)
-        if(os.path.isfile(errorPath) and os.path.getsize(errorPath) > 10000):
+        if(os.path.isfile(errorPath) and os.path.getsize(errorPath) > 100000):
             os.unlink(errorPath)
     except Exception as error:
         # writeErrorLog("error", error)
