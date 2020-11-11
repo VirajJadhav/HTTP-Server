@@ -5,7 +5,7 @@ from email.utils import formatdate
 import sys
 import os
 from configparser import ConfigParser
-import shutil
+from shutil import rmtree
 from uuid import uuid4
 import json
 
@@ -275,44 +275,46 @@ def getParsedData(connectionData=None, clientConnection=None):
                 # writeErrorLog("debug", error)
                 pass
             parsedData = list(connectionData.split("\r\n"))
-        if "application/x-www-form-urlencoded" in restHeaders["Content-Type"]:
-            tempBody = parsedData[headerEndCount + 1].split("&")
-            for tbody in tempBody:
-                try:
-                    key, value = tbody.split("=")
-                    requestBody[key] = parseRequestValueData(value)
-                except Exception as error:
-                    # writeErrorLog("debug", error)
-                    pass
-        elif "text/plain" in restHeaders["Content-Type"]:
-            reqBody = parsedData[headerEndCount + 1:]
-            for body in reqBody:
-                try:
-                    key, value = body.split("=")
-                    requestBody[key] = value
-                except Exception as error:
-                    # writeErrorLog("debug", error)
-                    pass
-        elif "multipart/form-data" in restHeaders["Content-Type"]:
-            # reqBoundary = restHeaders["Content-Type"].split("boundary=")[1]
-            reqBody = parsedData[headerEndCount + 1:]
-            for i in range(1, len(reqBody) - 4):
-                if ";" in reqBody[i]:
+        if "Content-Type" in restHeaders:
+            if "application/x-www-form-urlencoded" in restHeaders["Content-Type"]:
+                tempBody = parsedData[headerEndCount + 1].split("&")
+                for tbody in tempBody:
                     try:
-                        tbody = reqBody[i].split(";")
-                        if len(tbody) == 2:
-                            tkey = tbody[1].split("name=")[1].strip("\"")
-                            requestBody[tkey] = reqBody[i + 2]
-                        elif len(tbody) == 3:
-                            tkey = tbody[2].split("filename=")[1].strip("\"")
-                            requestBody[tkey] = str(reqBody[i + 3])
-                            if str(tkey).endswith(tuple(imageFileExtensions)):
-                                requestBody[tkey] += "\r\n" + \
-                                    str(reqBody[i + 4])
-                            requestBody["filename"] = tkey
+                        key, value = tbody.split("=")
+                        requestBody[key] = parseRequestValueData(value)
                     except Exception as error:
                         # writeErrorLog("debug", error)
                         pass
+            elif "text/plain" in restHeaders["Content-Type"]:
+                reqBody = parsedData[headerEndCount + 1:]
+                for body in reqBody:
+                    try:
+                        key, value = body.split("=")
+                        requestBody[key] = value
+                    except Exception as error:
+                        # writeErrorLog("debug", error)
+                        pass
+            elif "multipart/form-data" in restHeaders["Content-Type"]:
+                # reqBoundary = restHeaders["Content-Type"].split("boundary=")[1]
+                reqBody = parsedData[headerEndCount + 1:]
+                for i in range(1, len(reqBody) - 4):
+                    if ";" in reqBody[i]:
+                        try:
+                            tbody = reqBody[i].split(";")
+                            if len(tbody) == 2:
+                                tkey = tbody[1].split("name=")[1].strip("\"")
+                                requestBody[tkey] = reqBody[i + 2]
+                            elif len(tbody) == 3:
+                                tkey = tbody[2].split("filename=")[
+                                    1].strip("\"")
+                                requestBody[tkey] = str(reqBody[i + 3])
+                                if str(tkey).endswith(tuple(imageFileExtensions)):
+                                    requestBody[tkey] += "\r\n" + \
+                                        str(reqBody[i + 4])
+                                requestBody["filename"] = tkey
+                        except Exception as error:
+                            # writeErrorLog("debug", error)
+                            pass
     return requestedMethod, requestedPath, httpVersion, restHeaders, requestBody
 
 
@@ -360,32 +362,32 @@ def getRequestedFile(requestedPath="", fileMode=""):
 
 def setCookie(clientIP=None, restHeaders={}):
     global CONFIG
-    if "Cookie" in restHeaders:
-        return restHeaders["Cookie"].lstrip() + "; SameSite=Strict"
-    else:
-        cookieFile = CONFIG['COOKIE']['File']
-        if not os.path.isfile(cookieFile):
-            with open(cookieFile, "w") as f:
-                json.dump([], f, indent=4)
-        try:
-            cookieData = []
-            with open(cookieFile) as searchFile:
-                cookieData = json.load(searchFile)
-            for cookie in cookieData:
-                if cookie["clientIP"] == str(clientIP) and "cookie" in cookie:
-                    return "name=" + cookie['cookie'] + "; SameSite=Strict"
-            newCookie = uuid4()
-            newClient = {
-                'clientIP': str(clientIP),
-                'cookie': str(newCookie)
-            }
-            cookieData.append(newClient)
-            with open(cookieFile, "w") as searchFile:
-                json.dump(cookieData, searchFile, indent=4)
-            return "name=" + newClient['cookie'] + "; SameSite=Strict"
-        except Exception as error:
-            # writeErrorLog("debug", error)
-            pass
+    # if "Cookie" in restHeaders:
+    #     return restHeaders["Cookie"].lstrip() + "; SameSite=Strict"
+    # else:
+    cookieFile = CONFIG['COOKIE']['File']
+    if not os.path.isfile(cookieFile):
+        with open(cookieFile, "w") as f:
+            json.dump([], f, indent=4)
+    try:
+        cookieData = []
+        with open(cookieFile) as searchFile:
+            cookieData = json.load(searchFile)
+        for cookie in cookieData:
+            if cookie["clientIP"] == str(clientIP) and "cookie" in cookie:
+                return "name=" + cookie['cookie'] + "; SameSite=Strict"
+        newCookie = uuid4()
+        newClient = {
+            'clientIP': str(clientIP),
+            'cookie': str(newCookie)
+        }
+        cookieData.append(newClient)
+        with open(cookieFile, "w") as searchFile:
+            json.dump(cookieData, searchFile, indent=4)
+        return "name=" + newClient['cookie'] + "; SameSite=Strict"
+    except Exception as error:
+        # writeErrorLog("debug", error)
+        pass
 
 
 def getForbiddenResponse(httpVersion="", restHeaders={}):
@@ -685,30 +687,44 @@ def handleDELETERequest(httpVersion="", restHeaders={}, requestedPath="", reques
     response = ""
     fileExtension = "html"
     responseBodySize = "-"
-    if not os.access(requestedPath[1:], os.W_OK):
-        response, bodySize = getForbiddenResponse(httpVersion, restHeaders)
-        responseBodySize = bodySize
-    else:
-        try:
-            if os.path.isfile(requestedPath[1:]) or os.path.islink(requestedPath[1:]):
+    try:
+        if os.path.isfile(requestedPath[1:]) or os.path.islink(requestedPath[1:]):
+            if not os.access(requestedPath[1:], os.W_OK):
+                response, bodySize = getForbiddenResponse(
+                    httpVersion, restHeaders)
+                responseBodySize = bodySize
+                response = response.encode('ISO-8859-1')
+                writeAccessLog("DELETE", httpVersion,
+                               requestedPath, responseBodySize, restHeaders)
+                return response
+            else:
                 STATUSCODE = 200
                 os.unlink(requestedPath[1:])
-            elif os.path.isdir(requestedPath):
-                shutil.rmtree(requestedPath)
+        elif os.path.isdir(requestedPath):
+            if not os.access(requestedPath[1:], os.W_OK):
+                response, bodySize = getForbiddenResponse(
+                    httpVersion, restHeaders)
+                responseBodySize = bodySize
+                response = response.encode('ISO-8859-1')
+                writeAccessLog("DELETE", httpVersion,
+                               requestedPath, responseBodySize, restHeaders)
+                return response
             else:
-                STATUSCODE = 404
-                finalFile = "<!DOCTYPE html><html><head><title>DELETE</title></head><body><h1>Resource was not present !</h1></body></html>"
-        except Exception as error:
-            # writeErrorLog("error", error)
-            pass
-        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-        Response["Content-Type"] = switchContentType(fileExtension)
-        Response["Content-Length"] = str(len(finalFile))
-        Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
-        for key, value in Response.items():
-            response += key + ": " + value + "\r\n"
-        response += "\r\n" + finalFile
-        responseBodySize = Response["Content-Length"]
+                rmtree(requestedPath)
+        else:
+            STATUSCODE = 404
+            finalFile = "<!DOCTYPE html><html><head><title>DELETE</title></head><body><h1>Resource was not present !</h1></body></html>"
+    except Exception as error:
+        # writeErrorLog("error", error)
+        pass
+    response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+    Response["Content-Type"] = switchContentType(fileExtension)
+    Response["Content-Length"] = str(len(finalFile))
+    Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
+    for key, value in Response.items():
+        response += key + ": " + value + "\r\n"
+    response += "\r\n" + finalFile
+    responseBodySize = Response["Content-Length"]
     response = response.encode('ISO-8859-1')
     writeAccessLog("DELETE", httpVersion, requestedPath,
                    responseBodySize, restHeaders)
@@ -786,7 +802,8 @@ def establishConnection():
     try:
         serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         serverSocket.bind(('', serverPort))
-        serverSocket.listen()
+        listenToConnections = int(CONFIG["CONNECTIONS"]["Allowed"])
+        serverSocket.listen(listenToConnections)
         # serverSocket.listen(int(CONFIG.get("CONNECTIONS", "Allowed")))
     except Exception as error:
         writeErrorLog("error", error)
@@ -824,5 +841,5 @@ def readConfig():
 if __name__ == "__main__":
     readConfig()
     serverSocket = establishConnection()
-    print("The Server is ready to receive requests")
+    # print("The Server is ready to receive requests")
     startServer(serverSocket)

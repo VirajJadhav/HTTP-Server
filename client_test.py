@@ -1,93 +1,204 @@
-from socket import *
-import threading
-import sys
-import time
+import requests
+import json
 from configparser import ConfigParser
-
+import sys
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
+import time
 
 CONFIG = None
 
+DEBUG = False
 
-def establishConnection():
+
+def readTestFile(fileName=""):
+    testCases = []
+    with open(fileName, "r") as f:
+        testCases = json.load(f)
+    return testCases
+
+
+def loadThreads(case={}, method="", finalurl=""):
+    global DEBUG
+    response = b''
+    try:
+        if method == "GET":
+            if "headers" in case:
+                headers = case["headers"]
+                response = requests.get(finalurl, headers=headers)
+            else:
+                response = requests.get(finalurl)
+        elif method == "POST" or method == "PUT":
+            if ("data" in case and "file" in case) and ("name" in case["file"] and "path" in case["file"]):
+                data = case["data"]
+                f = case["file"]
+                if "fileType" in f:
+                    fileType = f['fileType'] + "/*"
+                else:
+                    fileType = "*/*"
+                try:
+                    files = {
+                        f["name"]: (
+                            f["name"],
+                            open(f["path"], "rb"),
+                            fileType
+                        )
+                    }
+                    if "headers" in case:
+                        headers = case["headers"]
+                        response = requests.post(
+                            finalurl, data=data, files=files, headers=headers)
+                    else:
+                        response = requests.post(
+                            finalurl, data=data, files=files)
+                except Exception as error:
+                    pass
+            elif "data" in case and not "file" in case:
+                data = case["data"]
+                if "headers" in case:
+                    headers = case["headers"]
+                    response = requests.post(
+                        finalurl, data=data, headers=headers)
+                else:
+                    response = requests.post(finalurl, data=data)
+            elif (not "data" in case and "file" in case) and ("name" in case["file"] and "path" in case["file"]):
+                f = case["file"]
+                if "fileType" in f:
+                    fileType = f['fileType'] + "/*"
+                else:
+                    fileType = "*/*"
+                try:
+                    files = {
+                        f["name"]: (
+                            f["name"],
+                            open(f["path"], "rb"),
+                            fileType
+                        )
+                    }
+                    if "headers" in case:
+                        headers = case["headers"]
+                        response = requests.post(
+                            finalurl, files=files, headers=headers)
+                    else:
+                        response = requests.post(finalurl, files=files)
+                except Exception as error:
+                    pass
+        elif method == "HEAD":
+            if "headers" in case:
+                headers = case["headers"]
+                response = requests.head(finalurl, headers=headers)
+            else:
+                response = requests.head(finalurl)
+        elif method == "DELETE":
+            if "headers" in case:
+                headers = case["headers"]
+                response = requests.delete(finalurl, headers=headers)
+            else:
+                response = requests.delete(finalurl)
+    except Exception as error:
+        print("Error: ", error)
+    if DEBUG:
+        print(f"{method} : {response}")
+
+
+def startLoadTesting(testCases=[]):
     global CONFIG
-    clientSocket = socket(AF_INET, SOCK_STREAM)
+    url = "http://localhost:" + str(CONFIG["DEFAULT"]["PORT"])
+    start = time.time()
+    threads = []
     try:
-        serverPort = int(CONFIG.get("DEFAULT", "PORT"))
+        for case in testCases:
+            if "method" in case:
+                method = case["method"].upper()
+                if "url" in case:
+                    finalurl = url + case["url"]
+                else:
+                    finalurl = url
+                startThread = threading.Thread(
+                    target=loadThreads, args=(case, method, finalurl, ))
+                threads.append(startThread)
+                startThread.start()
+        for thread in threads:
+            thread.join()
     except Exception as error:
-        print(error, 'of config file.')
-        print("Please specify a valid listen port in default section of config file.")
-        sys.exit(1)
-    try:
-        # clientSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        clientSocket.connect(('', serverPort))
-    except Exception as error:
-        print(error)
-        sys.exit(1)
-    return clientSocket
+        print("Error: ", error)
+    end = time.time()
+    print(f"Total requests : {len(threads)}")
+    print("Took {} seconds.".format(end - start))
+
+
+def concurrentThreads(testCases=[]):
+    global CONFIG
+    url = "http://localhost:" + str(CONFIG["DEFAULT"]["PORT"])
+    methods = []
+    finalurls = []
+    for case in testCases:
+        if "method" in case:
+            methods.append(case["method"].upper())
+        if "url" in case:
+            finalurls.append(url + case["url"])
+        else:
+            finalurls.append(url)
+    start = time.time()
+    with ThreadPoolExecutor(max_workers=len(testCases)) as pool:
+        totalReqs = len(
+            list(pool.map(loadThreads, testCases, methods, finalurls, )))
+        print(f"Total requests : {totalReqs}")
+    end = time.time()
+    print("Took {} seconds.".format(end - start))
 
 
 def readConfig():
     global CONFIG
     CONFIG = ConfigParser()
     try:
+        if not os.path.isdir('ConfigFiles'):
+            os.mkdir("ConfigFiles")
         CONFIG.read('ConfigFiles/config.ini')
     except Exception as error:
-        pass
+        sys.exit(1)
 
 
-def readTestFile():
-    testCases = []
-    testFile = ""
-    with open("test.txt", "r") as testFile:
-        testFile = testFile.read()
-    testCases = testFile.split("#" * 30)
-    return testCases
-
-
-def listenServer(clientSocket=None):
-    try:
-        response = clientSocket.recv(1024).decode('ISO-8859-1')
-        # print(response)
-        # print("#"*30)
-        # clientSocket.close()
-        # break
-    except Exception as error:
-        print(error)
-        pass
-
-
-def startClient(clientSocket=None, case=None):
-    validCase = case.lstrip("\n")
-    validCase = "\r\n".join(validCase.split("\n"))
-    try:
-        clientSocket.send(validCase.encode('ISO-8859-1'))
-        # break
-    except Exception as error:
-        print(error)
-        # break
-
-
-def startTesting(testCases=[]):
-    try:
-        for case in testCases:
-            if case == '':
-                continue
-            clientSocket = establishConnection()
-            keepListening = threading.Thread(
-                target=listenServer, args=(clientSocket, ))
-            keepListening.start()
-            startRequest = threading.Thread(
-                target=startClient, args=(clientSocket, case, ))
-            startRequest.start()
-            # clientSocket.close()
-    except Exception as error:
-        print(error)
+def runInstructions():
+    print("Test:")
+    print("\t1. Load:- \"python3 client_test.py -l <number-of-request>\"")
+    print("\t2. Concurrent:- \"python3 client_test.py -c <number-of-request>\"")
+    print("Options:")
+    print("\t-l, --load : Perform load testing.")
+    print("\t-c, --concurrent : Perform concurrent thread testing.")
+    print("\t<number-of-request> : Integer value for multiple same requests present in Test.json file,\n\t\tDefault value: Number of request objest present in Test.json.")
 
 
 if __name__ == "__main__":
-    readConfig()
-    testCases = readTestFile()
-    start = time.time()
-    startTesting(testCases)
-    end = time.time()
-    print(f"Took {end - start} seconds")
+    if len(sys.argv) > 1:
+        readConfig()
+        testCases = readTestFile("Test.json")
+        if ("--load" in sys.argv and "--concurrent" in sys.argv) or ("-l" in sys.argv and "-c" in sys.argv) or ("-l" in sys.argv and "--concurrent" in sys.argv) or ("--load" in sys.argv and "-c" in sys.argv):
+            runInstructions()
+        elif "-l" in sys.argv or "--load" in sys.argv:
+            reqNumber = 1
+            try:
+                intParams = [ele for ele in sys.argv if ele.isdigit()]
+                if len(intParams) >= 1:
+                    reqNumber = int(intParams[0])
+            except Exception as error:
+                print(
+                    "Invalid number of requests number.\nStarted testing for default number.")
+            if "--debug=True" in sys.argv:
+                DEBUG = True
+            startLoadTesting(testCases * reqNumber)
+        elif "-c" in sys.argv or "--concurrent" in sys.argv:
+            reqNumber = 1
+            try:
+                intParams = [ele for ele in sys.argv if ele.isdigit()]
+                if len(intParams) >= 1:
+                    reqNumber = int(intParams[0])
+            except Exception as error:
+                print(
+                    "Invalid number of requests number.\nStarted testing for default number.")
+            if "--debug=True" in sys.argv:
+                DEBUG = True
+            concurrentThreads(testCases * reqNumber)
+    else:
+        runInstructions()

@@ -1,0 +1,35 @@
+[
+    {
+        "method": "GET",
+        "url": "/"
+    },
+    {
+        "method": "HEAD",
+        "url": "/form.html"
+    },
+    {
+        "method": "DELETE",
+        "url": "/ClientFiles/something.txt"
+    },
+    {
+        "method": "PUT",
+        "url": "/ClientFiles/something.txt",
+        "data": {
+            "name": "name",
+            "age": "20",
+            "author": "author"
+        }
+    },
+    {
+        "method": "POST",
+        "url": "/",
+        "data": {
+            "name": "viraj"
+        },
+        "file": {
+            "name": "thisfile.txt",
+            "path": "/home/viraj007/Desktop/thisfile.txt",
+            "fileType": "text"
+        }
+    }
+]
