@@ -775,14 +775,16 @@ def eachClientThread(clientConnection=None):
 
 
 def startServer(serverSocket=None):
-    global CLIENTIP
+    global CLIENTIP, CONFIG
+    maxConnections = int(CONFIG["CONNECTIONS"]["Allowed"])
     while True:
         try:
-            clientConnection, addr = serverSocket.accept()
-            CLIENTIP = str(addr[0])
-            forEachConnection = threading.Thread(
-                target=eachClientThread, args=(clientConnection, ))
-            forEachConnection.start()
+            if threading.activeCount() <= maxConnections:
+                clientConnection, addr = serverSocket.accept()
+                CLIENTIP = str(addr[0])
+                forEachConnection = threading.Thread(
+                    target=eachClientThread, args=(clientConnection, ))
+                forEachConnection.start()
         except Exception as error:
             # writeErrorLog("error", error)
             # break

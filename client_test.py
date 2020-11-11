@@ -105,8 +105,9 @@ def loadThreads(case={}, method="", finalurl=""):
 def startLoadTesting(testCases=[]):
     global CONFIG
     url = "http://localhost:" + str(CONFIG["DEFAULT"]["PORT"])
-    start = time.time()
     threads = []
+    wasteThread = 0
+    start = time.time()
     try:
         for case in testCases:
             if "method" in case:
@@ -122,9 +123,14 @@ def startLoadTesting(testCases=[]):
         for thread in threads:
             thread.join()
     except Exception as error:
-        print("Error: ", error)
+        # print("Error: ", error)
+        wasteThread += 1
     end = time.time()
-    print(f"Total requests : {len(threads)}")
+    if len(threads) - wasteThread < 0:
+        finalCount = 0
+    else:
+        finalCount = len(threads) - wasteThread
+    print(f"Total requests : {finalCount}")
     print("Took {} seconds.".format(end - start))
 
 
@@ -133,6 +139,7 @@ def concurrentThreads(testCases=[]):
     url = "http://localhost:" + str(CONFIG["DEFAULT"]["PORT"])
     methods = []
     finalurls = []
+    maxConnections = int(CONFIG["CONNECTIONS"]["Allowed"])
     for case in testCases:
         if "method" in case:
             methods.append(case["method"].upper())
@@ -141,7 +148,7 @@ def concurrentThreads(testCases=[]):
         else:
             finalurls.append(url)
     start = time.time()
-    with ThreadPoolExecutor(max_workers=len(testCases)) as pool:
+    with ThreadPoolExecutor(max_workers=maxConnections) as pool:
         totalReqs = len(
             list(pool.map(loadThreads, testCases, methods, finalurls, )))
         print(f"Total requests : {totalReqs}")
