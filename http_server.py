@@ -32,6 +32,7 @@ def switchStatusCode(code=None):
         201: " 201 Created",
         304: " 304 Not Modified",
         400: " 400 Bad Request",
+        403: " 403 Forbidden",
         404: " 404 Not Found",
         411: " 411 Length Required",
         415: " 415 Unsupported Media Type",
@@ -387,6 +388,21 @@ def setCookie(clientIP=None, restHeaders={}):
             pass
 
 
+def getForbiddenResponse(httpVersion="", restHeaders={}):
+    global STATUSCODE, CLIENTIP
+    STATUSCODE = 403
+    fileExtension = "html"
+    finalFile = "<!DOCTYPE html><html><head><title>Delta-Server</title></head><body><h1>403</h1><h2>Server refuses to process request (restricted resource access)</h2></body></html>"
+    response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+    Response["Content-Type"] = switchContentType(fileExtension)
+    Response["Content-Length"] = str(len(finalFile))
+    Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
+    for key, value in Response.items():
+        response += str(key) + ": " + str(value) + "\r\n"
+    response += "\r\n" + finalFile
+    return response, Response["Content-Length"]
+
+
 def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
     global STATUSCODE, imageFileExtensions, Response, CLIENTIP
     finalFile = response = ""
@@ -398,69 +414,78 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
     if requestedPath.endswith(tuple(imageFileExtensions)):
         newRequestedPath, fileExtension, lastModified = getRequestedFile(
             requestedPath, "rb")
-        if STATUSCODE != 404 and "If-Modified-Since" in restHeaders and restHeaders["If-Modified-Since"].lstrip() == lastModified:
-            STATUSCODE = 304
-            response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-            if "Content-Type" in Response:
-                del Response["Content-Type"]
-            if "Content-Length" in Response:
-                del Response["Content-Length"]
-            if "Last-Modified" in Response:
-                del Response["Last-Modified"]
-            Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
-            for key, value in Response.items():
-                response += str(key) + ": " + str(value) + "\r\n"
+        if not os.access(newRequestedPath, os.R_OK):
+            response, bodySize = getForbiddenResponse(httpVersion, restHeaders)
+            responseBodySize = bodySize
             response = response.encode('ISO-8859-1')
         else:
-            try:
-                requestedFile = open(newRequestedPath, "rb")
-                with requestedFile:
-                    finalFile = requestedFile.read()
-            except Exception as error:
-                # writeErrorLog("error", error)
-                pass
-            response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-            Response["Content-Type"] = switchContentType(fileExtension)
-            Response["Content-Length"] = str(len(finalFile))
-            Response["Last-Modified"] = lastModified
-            Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
-            for key, value in Response.items():
-                response += str(key) + ": " + str(value) + "\r\n"
-            response += "\r\n"
-            responseBodySize = Response["Content-Length"]
-            response = response.encode('ISO-8859-1') + finalFile
+            if STATUSCODE != 404 and "If-Modified-Since" in restHeaders and restHeaders["If-Modified-Since"].lstrip() == lastModified:
+                STATUSCODE = 304
+                response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+                if "Content-Type" in Response:
+                    del Response["Content-Type"]
+                if "Content-Length" in Response:
+                    del Response["Content-Length"]
+                if "Last-Modified" in Response:
+                    del Response["Last-Modified"]
+                Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
+                for key, value in Response.items():
+                    response += str(key) + ": " + str(value) + "\r\n"
+                response = response.encode('ISO-8859-1')
+            else:
+                try:
+                    requestedFile = open(newRequestedPath, "rb")
+                    with requestedFile:
+                        finalFile = requestedFile.read()
+                except Exception as error:
+                    # writeErrorLog("error", error)
+                    pass
+                response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+                Response["Content-Type"] = switchContentType(fileExtension)
+                Response["Content-Length"] = str(len(finalFile))
+                Response["Last-Modified"] = lastModified
+                Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
+                for key, value in Response.items():
+                    response += str(key) + ": " + str(value) + "\r\n"
+                response += "\r\n"
+                responseBodySize = Response["Content-Length"]
+                response = response.encode('ISO-8859-1') + finalFile
     else:
         newRequestedPath, fileExtension, lastModified = getRequestedFile(
             requestedPath, "r")
-        if STATUSCODE != 404 and "If-Modified-Since" in restHeaders and restHeaders["If-Modified-Since"].lstrip() == lastModified:
-            STATUSCODE = 304
-            response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-            if "Content-Type" in Response:
-                del Response["Content-Type"]
-            if "Content-Length" in Response:
-                del Response["Content-Length"]
-            if "Last-Modified" in Response:
-                del Response["Last-Modified"]
-            Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
-            for key, value in Response.items():
-                response += str(key) + ": " + str(value) + "\r\n"
+        if not os.access(newRequestedPath, os.R_OK):
+            response, bodySize = getForbiddenResponse(httpVersion, restHeaders)
+            responseBodySize = bodySize
         else:
-            try:
-                requestedFile = open(newRequestedPath, "r")
-                with requestedFile:
-                    finalFile = requestedFile.read()
-            except Exception as error:
-                # writeErrorLog("error", error)
-                pass
-            response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-            Response["Content-Type"] = switchContentType(fileExtension)
-            Response["Content-Length"] = str(len(finalFile))
-            Response["Last-Modified"] = lastModified
-            Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
-            for key, value in Response.items():
-                response += str(key) + ": " + str(value) + "\r\n"
-            response += "\r\n" + finalFile
-            responseBodySize = Response["Content-Length"]
+            if STATUSCODE != 404 and "If-Modified-Since" in restHeaders and restHeaders["If-Modified-Since"].lstrip() == lastModified:
+                STATUSCODE = 304
+                response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+                if "Content-Type" in Response:
+                    del Response["Content-Type"]
+                if "Content-Length" in Response:
+                    del Response["Content-Length"]
+                if "Last-Modified" in Response:
+                    del Response["Last-Modified"]
+                Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
+                for key, value in Response.items():
+                    response += str(key) + ": " + str(value) + "\r\n"
+            else:
+                try:
+                    requestedFile = open(newRequestedPath, "r")
+                    with requestedFile:
+                        finalFile = requestedFile.read()
+                except Exception as error:
+                    # writeErrorLog("error", error)
+                    pass
+                response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+                Response["Content-Type"] = switchContentType(fileExtension)
+                Response["Content-Length"] = str(len(finalFile))
+                Response["Last-Modified"] = lastModified
+                Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
+                for key, value in Response.items():
+                    response += str(key) + ": " + str(value) + "\r\n"
+                response += "\r\n" + finalFile
+                responseBodySize = Response["Content-Length"]
 
         # print("RESPONSE BEFORE ENCODING: ", response)
 
@@ -541,22 +566,20 @@ def handleHEADRequest(httpVersion="", restHeaders={}, requestedPath=""):
     Response["Date"] = httpDateFormat()
     Response["Content-Type"] = switchContentType(fileExtension)
     STATUSCODE = 200
-    if requestedPath.endswith(tuple(imageFileExtensions)):
-        path = getValidFilePath(requestedPath)
-        if path.endswith(('not_found.html')):
-            STATUSCODE = 404
-        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-        Response["Content-Length"] = str(os.path.getsize(path))
+    path = getValidFilePath(requestedPath)
+    if not os.access(path, os.R_OK):
+        STATUSCODE = 403
+        finalFile = "<!DOCTYPE html><html><head><title>Delta-Server</title></head><body><h1>403</h1><h2>Server refuses to process request (restricted resource access)</h2></body></html>"
+        Response["Content-Length"] = str(len(finalFile))
     else:
-        path = getValidFilePath(requestedPath)
         if path.endswith(('not_found.html')):
             STATUSCODE = 404
-        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
         Response["Content-Length"] = str(os.path.getsize(path))
-    for key, value in Response.items():
-        response += key + ": " + value + "\r\n"
-    response += "\r\n"
+    response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
     Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
+    for key, value in Response.items():
+        response += str(key) + ": " + str(value) + "\r\n"
+    response += "\r\n"
     response = response.encode('ISO-8859-1')
     responseBodySize = Response["Content-Length"]
     writeAccessLog("HEAD", httpVersion, requestedPath,
@@ -574,7 +597,8 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
     STATUSCODE = 200
     path = "dump.txt"
     fileDataOutput = ""
-    if not os.path.exists(requestedPath) and requestedPath != "/":
+    exists = True
+    if not os.path.exists(requestedPath[1:]) and requestedPath != "/":
         STATUSCODE = 201
         sep = requestedPath.split("/")
         expectedFile = sep[-1].split(".")
@@ -591,14 +615,30 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
             path += "/" + sep[-1]
         else:
             try:
-                os.makedirs("/".join(sep))
+                if sep[0] == "" and len(sep) > 1:
+                    newReqPath = "/".join(sep[1:])
+                else:
+                    newReqPath = "/".join(sep)
+                os.makedirs(newReqPath)
             except Exception as error:
                 # writeErrorLog("error", error)
                 pass
-            path += "/dump.txt"
+            path = newReqPath + "/dump.txt"
+        exists = False
+    if os.path.exists(requestedPath[1:]) and not os.access(requestedPath[1:], os.W_OK):
+        response, bodySize = getForbiddenResponse(httpVersion, restHeaders)
+        responseBodySize = bodySize
+        response = response.encode('ISO-8859-1')
+        writeAccessLog("PUT", httpVersion, requestedPath,
+                       responseBodySize, restHeaders)
+        return response
     if "filename" in requestBody:
         resultFile = requestBody["filename"]
-        newPath = "/".join(path.rsplit("/", 1)) + "/"
+        newPath = ""
+        if not exists:
+            newPath = "/".join(path.rsplit("/", 1)) + "/"
+        elif requestedPath[1:] != "":
+            newPath = "/".join(requestedPath[1:].rsplit("/", 1)) + "/"
         try:
             fileMode = "a"
             fileContent = requestBody[requestBody["filename"]]
@@ -611,14 +651,15 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
             # writeErrorLog("error", error)
             pass
 
-        # fileDataOutput = requestBody[requestBody["filename"]]
         if requestBody["filename"] in requestBody:
             del requestBody[requestBody["filename"]]
-    # fileDataOutput += "\n"
+
     for key, value in requestBody.items():
         fileDataOutput += str(key) + " = " + str(value) + "\n"
-    fileDataOutput += "\n"
+
     try:
+        if exists and requestedPath[1:] != "" and not os.path.isfile(requestedPath[1:]):
+            path = requestedPath[1:] + "/dump.txt"
         with open(path, "w") as outputFile:
             outputFile.write(fileDataOutput)
     except Exception as error:
@@ -644,27 +685,31 @@ def handleDELETERequest(httpVersion="", restHeaders={}, requestedPath="", reques
     response = ""
     fileExtension = "html"
     responseBodySize = "-"
-    try:
-        if os.path.isfile(requestedPath[1:]) or os.path.islink(requestedPath[1:]):
-            STATUSCODE = 200
-            os.unlink(requestedPath[1:])
-        elif os.path.isdir(requestedPath):
-            shutil.rmtree(requestedPath)
-        else:
-            STATUSCODE = 404
-            finalFile = "<!DOCTYPE html><html><head><title>DELETE</title></head><body><h1>Resource was not present !</h1></body></html>"
-    except Exception as error:
-        # writeErrorLog("error", error)
-        pass
-    response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
-    Response["Content-Type"] = switchContentType(fileExtension)
-    Response["Content-Length"] = str(len(finalFile))
-    Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
-    for key, value in Response.items():
-        response += key + ": " + value + "\r\n"
-    response += "\r\n" + finalFile
+    if not os.access(requestedPath[1:], os.W_OK):
+        response, bodySize = getForbiddenResponse(httpVersion, restHeaders)
+        responseBodySize = bodySize
+    else:
+        try:
+            if os.path.isfile(requestedPath[1:]) or os.path.islink(requestedPath[1:]):
+                STATUSCODE = 200
+                os.unlink(requestedPath[1:])
+            elif os.path.isdir(requestedPath):
+                shutil.rmtree(requestedPath)
+            else:
+                STATUSCODE = 404
+                finalFile = "<!DOCTYPE html><html><head><title>DELETE</title></head><body><h1>Resource was not present !</h1></body></html>"
+        except Exception as error:
+            # writeErrorLog("error", error)
+            pass
+        response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
+        Response["Content-Type"] = switchContentType(fileExtension)
+        Response["Content-Length"] = str(len(finalFile))
+        Response["Set-Cookie"] = setCookie(CLIENTIP, restHeaders)
+        for key, value in Response.items():
+            response += key + ": " + value + "\r\n"
+        response += "\r\n" + finalFile
+        responseBodySize = Response["Content-Length"]
     response = response.encode('ISO-8859-1')
-    responseBodySize = Response["Content-Length"]
     writeAccessLog("DELETE", httpVersion, requestedPath,
                    responseBodySize, restHeaders)
     return response
