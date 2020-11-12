@@ -96,6 +96,6 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
      ```
 
 ## References  
-  RFC 2612 - https://tools.ietf.org/html/rfc2616
+  RFC 2616 - https://tools.ietf.org/html/rfc2616
   
   Python Docs - https://docs.python.org/3/
