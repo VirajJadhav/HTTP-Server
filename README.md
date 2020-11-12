@@ -9,46 +9,46 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
 
 **Requirements:**
 
-i. python installed (version >= 3.8)
-i. python packages - (socket, threading, datetime, email.utils, sys, os, configparser, shutil, uuid, json, requests)
+1. python installed (version >= 3.8)
+2. python packages - (socket, threading, datetime, email.utils, sys, os, configparser, shutil, uuid, json, requests)
 
 **Steps To Run:**
 
 - Server:
   `sudo python3 main.py <options>`
-    i. \<options>
-        i. To start server: start | START
-            i. `sudo python3 main.py start`
+    1. \<options>
+        - To start server: start | START
+            - `sudo python3 main.py start`
             or
-            i. `sudo python3 main.py START`
-        i. To stop server: stop | STOP
-            i. `sudo python3 main.py stop`
+            - `sudo python3 main.py START`
+        - To stop server: stop | STOP
+            - `sudo python3 main.py stop`
             or
-            i. `sudo python3 main.py STOP`
-        i. To restart server: restart | RESTART
-            i. `sudo python3 main.py restart`
+            - `sudo python3 main.py STOP`
+        - To restart server: restart | RESTART
+            - `sudo python3 main.py restart`
             or
-            i. `sudo python3 main.py RESTART`
+            - `sudo python3 main.py RESTART`
 
 - Client Tester:
-    i. Load Testing
+    1. Load Testing
         - `python3 client_test.py -l <number-of-requests>`
-            i. Options
+            - Options
                 - -l, --load
                 - --debug=True (For logging response codes on terminal for respective request methods)
-            i. \<number-of-requests> (optional) : Integer value for multiple same requests present in **LTest.json** file.
+            - \<number-of-requests> (optional) : Integer value for multiple same requests present in **LTest.json** file.
             Default value: Number of request objest present in **LTest.json**.
-    i. Confirmation Testing
+    2. Confirmation Testing
         - `python3 client_test.py -c <method-name>`
-            i. Options
+            - Options
                 - -c, --confirmation
                 - --debug=True (For logging response codes on terminal for respective request methods)
-            i. \<method-name> : **GET** | **POST** | **PUT** | **DELETE** | **HEAD** (requests present / to be added in **CTest.json** file)
+            - \<method-name> : **GET** | **POST** | **PUT** | **DELETE** | **HEAD** (requests present / to be added in **CTest.json** file)
 
 ### Important file Syntax
 
-i. CTest.json or LTest.json (For testing purpose)
-    - Key, value pairs expected per object (file is in json format)
+1. CTest.json or LTest.json (For testing purpose)
+  - Key, value pairs expected per object (file is in json format)
     - possible keys:
         - "method": which states HTTP method ("GET", "POST", "PUT", "DELETE", "HEAD")
         - "url": url to which the request is sent ("/index.html", "/something", etc); (Default is "/")
@@ -74,7 +74,7 @@ i. CTest.json or LTest.json (For testing purpose)
             }
     - possible values:
         - Anything with well defined and valid characters.
-i. config.ini (Config file)
+2. config.ini (Config file)
     - Present in ConfigFiles/config.ini or (\<absolute-path>/ConfigFiles/config.ini)
     - **Syntax**
         - \[SECTION]
