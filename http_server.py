@@ -87,8 +87,24 @@ def getLastModifiedTime(path=""):
     return lastModified
 
 
+def clearInvalidLog(Access=True, Error=True):
+    global CONFIG
+    try:
+        accessPath = CONFIG['LOG']['Access']
+        errorPath = CONFIG['LOG']['Error']
+        if Access:
+            if(os.path.isfile(accessPath) and os.path.getsize(accessPath) > 1000000):
+                os.unlink(accessPath)
+        if Error:
+            if(os.path.isfile(errorPath) and os.path.getsize(errorPath) > 1000000):
+                os.unlink(errorPath)
+    except Exception as error:
+        writeErrorLog("error", error)
+
+
 def writeErrorLog(Code="", Error=""):
     global CLIENTIP, CONFIG
+    clearInvalidLog(Access=False, Error=True)
     date = httpDateFormat(True)
     pid = str(os.getpid())
     tid = str(threading.current_thread().ident)
@@ -110,6 +126,7 @@ def writeErrorLog(Code="", Error=""):
 
 def writeAccessLog(requestedMethod="", httpVersion="", requestedPath="", responseBodySize="-", restHeaders={}):
     global STATUSCODE, CLIENTIP, CONFIG
+    clearInvalidLog(Access=True, Error=False)
     date = httpDateFormat(True)
     if CLIENTIP != None:
         log = CLIENTIP + " "
@@ -135,8 +152,7 @@ def writeAccessLog(requestedMethod="", httpVersion="", requestedPath="", respons
         with open(CONFIG['LOG']['Access'], "a") as outputFile:
             outputFile.write(log)
     except Exception as error:
-        # writeErrorLog("error", error)
-        pass
+        writeErrorLog("error", error)
 
 
 def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
@@ -145,8 +161,6 @@ def validateRequest(requestedMethod="", httpVersion="", restHeaders={}):
     response = ""
     fileExtension = "html"
     Response["Date"] = httpDateFormat()
-    # if requestedMethod == None:
-    #     return response, False
     if requestedMethod not in ["GET", "POST", "PUT", "DELETE", "HEAD"]:
         STATUSCODE = 501
         httpVersion = "HTTP/1.1"
@@ -224,14 +238,14 @@ def parseRequestValueData(value=None):
                     tvalue[i][:2])
                 value += bytesData.decode("ASCII") + tvalue[i][2:]
             except Exception as error:
-                # writeErrorLog("debug", error)
-                pass
+                writeErrorLog("debug", error)
     return value
 
 
 def getParsedData(connectionData=None, clientConnection=None):
     global imageFileExtensions
     parsedData = connectionData.split("\r\n")
+    # print(connectionData)
     # print(parsedData)
     headerEndCount = 0
     requestedMethod = None
@@ -253,7 +267,7 @@ def getParsedData(connectionData=None, clientConnection=None):
             key, value = data.split(":", 1)
             restHeaders[key] = value
         except Exception as error:
-            # writeErrorLog("debug", error)
+            writeErrorLog("debug", error)
             break
     if requestedMethod == "GET" or requestedMethod == "HEAD":
         pass
@@ -272,8 +286,7 @@ def getParsedData(connectionData=None, clientConnection=None):
                         str(extraConnectionData)
                     extraData -= int(len(extraConnectionData))
             except Exception as error:
-                # writeErrorLog("debug", error)
-                pass
+                writeErrorLog("debug", error)
             parsedData = list(connectionData.split("\r\n"))
         if "Content-Type" in restHeaders:
             if "application/x-www-form-urlencoded" in restHeaders["Content-Type"]:
@@ -283,17 +296,18 @@ def getParsedData(connectionData=None, clientConnection=None):
                         key, value = tbody.split("=")
                         requestBody[key] = parseRequestValueData(value)
                     except Exception as error:
-                        # writeErrorLog("debug", error)
-                        pass
+                        writeErrorLog("debug", error)
             elif "text/plain" in restHeaders["Content-Type"]:
                 reqBody = parsedData[headerEndCount + 1:]
+                index = 0
                 for body in reqBody:
+                    index += 1
                     try:
                         key, value = body.split("=")
                         requestBody[key] = value
                     except Exception as error:
-                        # writeErrorLog("debug", error)
-                        pass
+                        writeErrorLog("debug", error)
+                        requestBody["body" + str(index)] = body
             elif "multipart/form-data" in restHeaders["Content-Type"]:
                 # reqBoundary = restHeaders["Content-Type"].split("boundary=")[1]
                 reqBody = parsedData[headerEndCount + 1:]
@@ -313,8 +327,7 @@ def getParsedData(connectionData=None, clientConnection=None):
                                         str(reqBody[i + 4])
                                 requestBody["filename"] = tkey
                         except Exception as error:
-                            # writeErrorLog("debug", error)
-                            pass
+                            writeErrorLog("debug", error)
     return requestedMethod, requestedPath, httpVersion, restHeaders, requestBody
 
 
@@ -347,13 +360,11 @@ def getRequestedFile(requestedPath="", fileMode=""):
         else:
             fileExtension = "html"
     except Exception as error:
-        # writeErrorLog("debug", error)
-        pass
+        writeErrorLog("debug", error)
     try:
         newRequestedPath = getValidFilePath(requestedPath)
     except Exception as error:
-        # writeErrorLog("debug", error)
-        pass
+        writeErrorLog("debug", error)
     lastModified = getLastModifiedTime(newRequestedPath)
     # print("FILE REPRESENTATIONS BEFORE RETURNING: ",
     #       newRequestedPath, fileExtension, lastModified)
@@ -386,8 +397,7 @@ def setCookie(clientIP=None, restHeaders={}):
             json.dump(cookieData, searchFile, indent=4)
         return "name=" + newClient['cookie'] + "; SameSite=Strict"
     except Exception as error:
-        # writeErrorLog("debug", error)
-        pass
+        writeErrorLog("debug", error)
 
 
 def getForbiddenResponse(httpVersion="", restHeaders={}):
@@ -440,8 +450,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
                     with requestedFile:
                         finalFile = requestedFile.read()
                 except Exception as error:
-                    # writeErrorLog("error", error)
-                    pass
+                    writeErrorLog("error", error)
                 response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
                 Response["Content-Type"] = switchContentType(fileExtension)
                 Response["Content-Length"] = str(len(finalFile))
@@ -477,8 +486,7 @@ def handleGETRequest(httpVersion="", restHeaders={}, requestedPath=""):
                     with requestedFile:
                         finalFile = requestedFile.read()
                 except Exception as error:
-                    # writeErrorLog("error", error)
-                    pass
+                    writeErrorLog("error", error)
                 response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
                 Response["Content-Type"] = switchContentType(fileExtension)
                 Response["Content-Length"] = str(len(finalFile))
@@ -520,8 +528,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
             with open(CONFIG['CLIENT']['Directory'] + "/" + resultFile, fileMode) as writeFile:
                 writeFile.write(fileContent)
         except Exception as error:
-            # writeErrorLog("error", error)
-            pass
+            writeErrorLog("error", error)
         if requestBody["filename"] in requestBody:
             del requestBody[requestBody["filename"]]
     newPostData = "POST Date: " + Response["Date"] + "\n" + "POST DATA:\n"
@@ -538,8 +545,7 @@ def handlePOSTRequest(httpVersion="", restHeaders={}, requestedPath="", requestB
         # with open(CONFIG['PATH']['DocumentRoot'] + "/server_data.txt", "a") as outputFile:
         #     outputFile.write(newPostData)
     except Exception as error:
-        # writeErrorLog("error", error)
-        pass
+        writeErrorLog("error", error)
     response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
     Response["Content-Type"] = switchContentType(fileExtension)
     Response["Content-Length"] = str(len(finalFile))
@@ -563,8 +569,7 @@ def handleHEADRequest(httpVersion="", restHeaders={}, requestedPath=""):
         if os.path.isfile(CONFIG['PATH']['DocumentRoot'] + requestedPath):
             fileExtension = requestedPath.split(".")[-1]
     except Exception as error:
-        # writeErrorLog("debug", error)
-        pass
+        writeErrorLog("debug", error)
     Response["Date"] = httpDateFormat()
     Response["Content-Type"] = switchContentType(fileExtension)
     STATUSCODE = 200
@@ -612,8 +617,7 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
             try:
                 os.makedirs(path)
             except Exception as error:
-                # writeErrorLog("error", error)
-                pass
+                writeErrorLog("error", error)
             path += "/" + sep[-1]
         else:
             try:
@@ -623,8 +627,7 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
                     newReqPath = "/".join(sep)
                 os.makedirs(newReqPath)
             except Exception as error:
-                # writeErrorLog("error", error)
-                pass
+                writeErrorLog("error", error)
             path = newReqPath + "/dump.txt"
         exists = False
     if os.path.exists(requestedPath[1:]) and not os.access(requestedPath[1:], os.W_OK):
@@ -650,8 +653,7 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
             with open(newPath + resultFile, fileMode) as writeFile:
                 writeFile.write(fileContent)
         except Exception as error:
-            # writeErrorLog("error", error)
-            pass
+            writeErrorLog("error", error)
 
         if requestBody["filename"] in requestBody:
             del requestBody[requestBody["filename"]]
@@ -665,8 +667,7 @@ def handlePUTRequest(httpVersion="", restHeaders={}, requestedPath="", requestBo
         with open(path, "w") as outputFile:
             outputFile.write(fileDataOutput)
     except Exception as error:
-        # writeErrorLog("error", error)
-        pass
+        writeErrorLog("error", error)
     response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
     Response["Content-Type"] = switchContentType(fileExtension)
     Response["Content-Length"] = str(len(finalFile))
@@ -715,8 +716,7 @@ def handleDELETERequest(httpVersion="", restHeaders={}, requestedPath="", reques
             STATUSCODE = 404
             finalFile = "<!DOCTYPE html><html><head><title>DELETE</title></head><body><h1>Resource was not present !</h1></body></html>"
     except Exception as error:
-        # writeErrorLog("error", error)
-        pass
+        writeErrorLog("error", error)
     response = httpVersion + switchStatusCode(STATUSCODE) + "\r\n"
     Response["Content-Type"] = switchContentType(fileExtension)
     Response["Content-Length"] = str(len(finalFile))
@@ -769,9 +769,7 @@ def eachClientThread(clientConnection=None):
         clientConnection.close()
 
     except Exception as error:
-        # writeErrorLog("error", error)
-        # break
-        pass
+        writeErrorLog("error", error)
 
 
 def startServer(serverSocket=None):
@@ -786,9 +784,7 @@ def startServer(serverSocket=None):
                     target=eachClientThread, args=(clientConnection, ))
                 forEachConnection.start()
         except Exception as error:
-            # writeErrorLog("error", error)
-            # break
-            pass
+            writeErrorLog("error", error)
 
 
 def establishConnection():
@@ -799,32 +795,15 @@ def establishConnection():
     except Exception as error:
         print(error, 'of config file.')
         print("Please specify a valid listen port in default section of config file.")
-        # writeErrorLog("error", error)
+        writeErrorLog("error", error)
         sys.exit(1)
     try:
         serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         serverSocket.bind(('', serverPort))
-        listenToConnections = int(CONFIG["CONNECTIONS"]["Allowed"])
-        serverSocket.listen(listenToConnections)
-        # serverSocket.listen(int(CONFIG.get("CONNECTIONS", "Allowed")))
+        serverSocket.listen(1)
     except Exception as error:
         writeErrorLog("error", error)
-        pass
     return serverSocket
-
-
-def clearInvalidLog():
-    global CONFIG
-    try:
-        accessPath = CONFIG['LOG']['Access']
-        errorPath = CONFIG['LOG']['Error']
-        if(os.path.isfile(accessPath) and os.path.getsize(accessPath) > 100000):
-            os.unlink(accessPath)
-        if(os.path.isfile(errorPath) and os.path.getsize(errorPath) > 100000):
-            os.unlink(errorPath)
-    except Exception as error:
-        # writeErrorLog("error", error)
-        pass
 
 
 def readConfig():

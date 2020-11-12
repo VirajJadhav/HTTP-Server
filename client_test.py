@@ -4,23 +4,28 @@ from configparser import ConfigParser
 import sys
 import os
 import threading
-from concurrent.futures import ThreadPoolExecutor
+# from concurrent.futures import ThreadPoolExecutor
 import time
 
 CONFIG = None
 
 DEBUG = False
 
+WASTETHREAD = 0
+
 
 def readTestFile(fileName=""):
     testCases = []
+    if not os.path.isfile(fileName):
+        with open(fileName, "w") as f:
+            json.dump([], f, indent=4)
     with open(fileName, "r") as f:
         testCases = json.load(f)
     return testCases
 
 
 def loadThreads(case={}, method="", finalurl=""):
-    global DEBUG
+    global DEBUG, WASTETHREAD
     response = b''
     try:
         if method == "GET":
@@ -97,16 +102,16 @@ def loadThreads(case={}, method="", finalurl=""):
             else:
                 response = requests.delete(finalurl)
     except Exception as error:
-        print("Error: ", error)
+        # print("Error: ", error)
+        WASTETHREAD += 1
     if DEBUG:
         print(f"{method} : {response}")
 
 
 def startLoadTesting(testCases=[]):
-    global CONFIG
+    global CONFIG, WASTETHREAD
     url = "http://localhost:" + str(CONFIG["DEFAULT"]["PORT"])
     threads = []
-    wasteThread = 0
     start = time.time()
     try:
         for case in testCases:
@@ -123,37 +128,53 @@ def startLoadTesting(testCases=[]):
         for thread in threads:
             thread.join()
     except Exception as error:
-        # print("Error: ", error)
-        wasteThread += 1
+        print("Error: ", error)
     end = time.time()
-    if len(threads) - wasteThread < 0:
+    if len(threads) - WASTETHREAD < 0:
         finalCount = 0
     else:
-        finalCount = len(threads) - wasteThread
+        finalCount = len(threads) - WASTETHREAD
     print(f"Total requests : {finalCount}")
     print("Took {} seconds.".format(end - start))
 
+# Concurrent Testing using concurrent.futures module
+# def concurrentThreads(testCases=[]):
+#     global CONFIG
+#     url = "http://localhost:" + str(CONFIG["DEFAULT"]["PORT"])
+#     methods = []
+#     finalurls = []
+#     maxConnections = int(CONFIG["CONNECTIONS"]["Allowed"])
+#     for case in testCases:
+#         if "method" in case:
+#             methods.append(case["method"].upper())
+#         if "url" in case:
+#             finalurls.append(url + case["url"])
+#         else:
+#             finalurls.append(url)
+#     start = time.time()
+#     with ThreadPoolExecutor(max_workers=maxConnections) as pool:
+#         totalReqs = len(
+#             list(pool.map(loadThreads, testCases, methods, finalurls, )))
+#         print(f"Total requests : {totalReqs}")
+#     end = time.time()
+#     print("Took {} seconds.".format(end - start))
 
-def concurrentThreads(testCases=[]):
+
+def confirmationTesting(testCases=[], method=""):
     global CONFIG
     url = "http://localhost:" + str(CONFIG["DEFAULT"]["PORT"])
-    methods = []
-    finalurls = []
-    maxConnections = int(CONFIG["CONNECTIONS"]["Allowed"])
+    flag = False
     for case in testCases:
-        if "method" in case:
-            methods.append(case["method"].upper())
-        if "url" in case:
-            finalurls.append(url + case["url"])
-        else:
-            finalurls.append(url)
-    start = time.time()
-    with ThreadPoolExecutor(max_workers=maxConnections) as pool:
-        totalReqs = len(
-            list(pool.map(loadThreads, testCases, methods, finalurls, )))
-        print(f"Total requests : {totalReqs}")
-    end = time.time()
-    print("Took {} seconds.".format(end - start))
+        if "method" in case and case["method"] == method:
+            if "url" in case:
+                finalurl = url + case["url"]
+            else:
+                finalurl = url
+            loadThreads(case, method, finalurl)
+            flag = True
+            break
+    if not flag:
+        print("Method not present in CTest.json file.\nPlease update request method packet accordingly in CTest.json")
 
 
 def readConfig():
@@ -170,20 +191,22 @@ def readConfig():
 def runInstructions():
     print("Test:")
     print("\t1. Load:- \"python3 client_test.py -l <number-of-request>\"")
-    print("\t2. Concurrent:- \"python3 client_test.py -c <number-of-request>\"")
+    print("\t2. Confirmation:- \"python3 client_test.py -c <method-name>\"")
     print("Options:")
     print("\t-l, --load : Perform load testing.")
-    print("\t-c, --concurrent : Perform concurrent thread testing.")
-    print("\t<number-of-request> : Integer value for multiple same requests present in Test.json file,\n\t\tDefault value: Number of request objest present in Test.json.")
+    print("\t-c, --confirmation : Perform concurrent thread testing.")
+    print("\t<number-of-request> (optional) : Integer value for multiple same requests present in LTest.json file,\n\t\tDefault value: Number of request objest present in Test.json.")
+    print("\t<method-name> : GET | POST | PUT | DELETE | HEAD (requests present in CTest.json file)")
+    print("\t--debug=True : For logging response codes on terminal for respective request methods.")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 1 and len(sys.argv) < 5:
         readConfig()
-        testCases = readTestFile("Test.json")
-        if ("--load" in sys.argv and "--concurrent" in sys.argv) or ("-l" in sys.argv and "-c" in sys.argv) or ("-l" in sys.argv and "--concurrent" in sys.argv) or ("--load" in sys.argv and "-c" in sys.argv):
+        if ("--load" in sys.argv and "--confirmation" in sys.argv) or ("-l" in sys.argv and "-c" in sys.argv) or ("-l" in sys.argv and "--confirmation" in sys.argv) or ("--load" in sys.argv and "-c" in sys.argv):
             runInstructions()
         elif "-l" in sys.argv or "--load" in sys.argv:
+            testCases = readTestFile("LTest.json")
             reqNumber = 1
             try:
                 intParams = [ele for ele in sys.argv if ele.isdigit()]
@@ -195,17 +218,33 @@ if __name__ == "__main__":
             if "--debug=True" in sys.argv:
                 DEBUG = True
             startLoadTesting(testCases * reqNumber)
-        elif "-c" in sys.argv or "--concurrent" in sys.argv:
-            reqNumber = 1
-            try:
-                intParams = [ele for ele in sys.argv if ele.isdigit()]
-                if len(intParams) >= 1:
-                    reqNumber = int(intParams[0])
-            except Exception as error:
-                print(
-                    "Invalid number of requests number.\nStarted testing for default number.")
+        elif "-c" in sys.argv or "--confirmation" in sys.argv:
+            testCases = readTestFile("CTest.json")
+            validInputMethods = ["GET", "POST", "PUT", "DELETE", "HEAD"]
             if "--debug=True" in sys.argv:
                 DEBUG = True
-            concurrentThreads(testCases * reqNumber)
+            try:
+                methodParams = [
+                    ele for ele in sys.argv if ele in validInputMethods]
+                if len(methodParams) >= 1:
+                    confirmationTesting(testCases, methodParams[0].upper())
+                else:
+                    print("Invalid request method.\n")
+                    runInstructions()
+            except Exception as error:
+                print("Invalid request method.\n")
+                runInstructions()
+            # reqNumber = 1
+            # try:
+            #     intParams = [ele for ele in sys.argv if ele.isdigit()]
+            #     if len(intParams) >= 1:
+            #         reqNumber = int(intParams[0])
+            # except Exception as error:
+            #     print(
+            #         "Invalid number of requests number.\nStarted testing for default number.")
+
+            # concurrentThreads(testCases * reqNumber)
+        else:
+            runInstructions()
     else:
         runInstructions()

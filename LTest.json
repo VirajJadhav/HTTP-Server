@@ -1,0 +1,35 @@
+[
+    {
+        "method": "GET",
+        "url": "/"
+    },
+    {
+        "method": "HEAD",
+        "url": "/form.html"
+    },
+    {
+        "method": "HEAD",
+        "url": "/form"
+    },
+    {
+        "method": "DELETE",
+        "url": "/ClientFiles/something.txt"
+    },
+    {
+        "method": "PUT",
+        "url": "/ClientFiles/some.txt",
+        "data": {
+            "name": "name",
+            "age": "20",
+            "email": "viraj@gmail.com"
+        }
+    },
+    {
+        "method": "POST",
+        "url": "/",
+        "data": {
+            "name": "viraj",
+            "location": "pune"
+        }
+    }
+]
