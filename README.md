@@ -46,7 +46,7 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
          - --debug=True (For logging response codes on terminal for respective request methods)
        - \<method-name> : **GET** | **POST** | **PUT** | **DELETE** | **HEAD** (requests present / to be added in **CTest.json** file)
 
-### Important file Syntax
+## Important file Syntax
 
 1. CTest.json or LTest.json (For testing purpose)
 
@@ -77,8 +77,13 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
 1. config.ini (Config file)
    - Present in ConfigFiles/config.ini or (\<absolute-path>/ConfigFiles/config.ini)
    - **Syntax**
-     - \[SECTION]
-       key = value
-       eg,
-       \[DEFAULT]
-       PORT = 4000
+     \[SECTION]
+     key = value
+     eg,
+     \[DEFAULT]
+     PORT = 4000
+
+## References
+
+    - RFC 2612 - [https://tools.ietf.org/html/rfc2616]
+    - Python Docs - [https://docs.python.org/3/]
