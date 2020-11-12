@@ -194,8 +194,8 @@ def runInstructions():
     print("\t2. Confirmation:- \"python3 client_test.py -c <method-name>\"")
     print("Options:")
     print("\t-l, --load : Perform load testing.")
-    print("\t-c, --confirmation : Perform concurrent thread testing.")
-    print("\t<number-of-request> (optional) : Integer value for multiple same requests present in LTest.json file,\n\t\tDefault value: Number of request objest present in Test.json.")
+    print("\t-c, --confirmation : Perform confirmation testing.")
+    print("\t<number-of-request> (optional) : Integer value for multiple same requests present in LTest.json file,\n\t\tDefault value: Number of request objest present in LTest.json.")
     print("\t<method-name> : GET | POST | PUT | DELETE | HEAD (requests present in CTest.json file)")
     print("\t--debug=True : For logging response codes on terminal for respective request methods.")
 
