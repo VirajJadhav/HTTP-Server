@@ -49,55 +49,70 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
 ## Important file Syntax
 
 1. CTest.json or LTest.json (For testing purpose)
-
-   - Key, value pairs expected per object (file is in json format)
-     - possible keys (case-sensitive):
-       - "method": which states HTTP method ("GET", "POST", "PUT", "DELETE", "HEAD")
-       - "url": url to which the request is sent ("/index.html", "/something", etc); (Default is "/")
-       - "data" (Applicable for POST and PUT):
-         Again in key, value pairs, eg,
-       - "file" (Applicable for POST and PUT):
-         Again in key, value pais, possible keys: 
+   - possible keys (case-sensitive):
+     - "method": which states HTTP method ("GET", "POST", "PUT", "DELETE", "HEAD")
+     - "url": url to which the request is sent ("/index.html", "/something", etc); (Default is "/")
+     - "data" (Applicable for POST and PUT): Again in key, value pairs.
+     - "file" (Applicable for POST and PUT): Again in key, value pais.
          - "name": filename that is expected to be stored on server 
          - "path": file path from where the client is expected to pick the file (Absolute path is expected) 
          - "fileType" (options): eg = ("text", "image"); (Default is "_/_")
-         eg,
->         {
->            "method": "POST",
->            "url": "/something",
->            "data" = {
->             "name": "Delta-server",
->             "location": "pune",
->             .
->             .
->             .
->           },
->            "file" = {
->              "name": "serverToBeuploaded.txt",
->              "path": "/home/USER/Desktop/somefile.txt",
->              "fileType": "text"
->           }
->         },         
->         {
->            "method": "GET",
->            "url": "/index.html"
->         }
-
    - possible values:
      - Anything with well defined and valid characters.
+     
+      example:-
+      
+  >         {
+  >            "method": "POST",
+  >            "url": "/something",
+  >            "data" = {
+  >             "name": "Delta-server",
+  >             "location": "pune",
+  >             .
+  >             .
+  >             .
+  >           },
+  >            "file" = {
+  >              "name": "serverToBeuploaded.txt",
+  >              "path": "/home/USER/Desktop/somefile.txt",
+  >              "fileType": "text"
+  >           }
+  >         },         
+  >         {
+  >            "method": "GET",
+  >            "url": "/index.html"
+  >         }
 
-1. config.ini (Config file)
+2. config.ini (Config file)
    - Present in ConfigFiles/config.ini or (\<absolute-path>/ConfigFiles/config.ini)
    - **Syntax**
+   
      ```
      [SECTION]
      key = value
+     
      eg,
+     
      [DEFAULT]
      PORT = 4000
      ```
+3. Log Files
+  - Access log
+    - \<client-ip> \[\<date>] \<method> \<path/url> \<http-version> \<status-code> \<response-body-size> \<referer> \<user-agent>
+    - Optional fields: 
+      - \<referer> - mentioned if present else "-"
+      - \<user-agent> - mentioned if present else "-"
+  - Error log
+    - \[\<date>] \[core: \<core-value>] \[pid: \<process-id>:tid \<thread-id>] \[\<client-ip>] \[\<error-message>]
+    - Value Meaning:
+      - \<core-value>
+        - error (if it is a server error)
+        - debug (not an error but debug information)
+      - \<process-id> : process id of running server program
+      - \<thread-id> : thread id of acitve thread that lead this error log
 
 ## References  
-  RFC 2612 - https://tools.ietf.org/html/rfc2616
+
+  RFC 2616 - https://tools.ietf.org/html/rfc2616
   
   Python Docs - https://docs.python.org/3/
