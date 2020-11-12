@@ -96,6 +96,20 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
      [DEFAULT]
      PORT = 4000
      ```
+3. Log Files
+  - Access log
+    - \<client-ip> \[\<date>] \<method> \<path/url> \<http-version> \<status-code> \<response-body-size> \<referer> \<user-agent>
+    - Optional fields: 
+      - \<referer> - mentioned if present else "-"
+      - \<user-agent> - mentioned if present else "-"
+  - Error log
+    - \[\<date>] \[core: \<core-value>] \[pid: \<process-id>:tid \<thread-id>] \[\<client-ip>] \[\<error-message>]
+    - Value Meaning:
+      - \<core-value>
+        - error (if it is a server error)
+        - debug (not an error but debug information)
+      - \<process-id> : process id of running server program
+      - \<thread-id> : thread id of acitve thread that lead this error log
 
 ## References  
 
