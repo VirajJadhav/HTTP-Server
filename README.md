@@ -56,34 +56,36 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
        - "url": url to which the request is sent ("/index.html", "/something", etc); (Default is "/")
        - "data" (Applicable for POST and PUT):
          Again in key, value pairs, eg,
-         "data" = {
-         "name": "Delta-server",
-         "location": "pune",
-         .
-         .
-         .
-         }
+>         "data" = {
+>          "name": "Delta-server",
+>          "location": "pune",
+>          .
+>          .
+>          .
+>         }
        - "file" (Applicable for POST and PUT):
          Again in key, value pais, possible keys: - "name": filename that is expected to be stored on server - "path": file path from where the client is expected to pick the file (Absolute path is expected) - "fileType" (options): eg - ("text", "image"); (Default is "_/_")
          eg,
-         "file" = {
-         "name": "serverToBeuploaded.txt",
-         "path": "/home/USER/Desktop/somefile.txt",
-         "fileType": "text"
-         }
+>         "file" = {
+>          "name": "serverToBeuploaded.txt",
+>          "path": "/home/USER/Desktop/somefile.txt",
+>          "fileType": "text"
+>        }
    - possible values:
      - Anything with well defined and valid characters.
 
 1. config.ini (Config file)
    - Present in ConfigFiles/config.ini or (\<absolute-path>/ConfigFiles/config.ini)
    - **Syntax**
-     \[SECTION]
+     ```
+     [SECTION]
      key = value
      eg,
-     \[DEFAULT]
+     [DEFAULT]
      PORT = 4000
+     ```
 
-## References
-
-    - RFC 2612 - [https://tools.ietf.org/html/rfc2616]
-    - Python Docs - [https://docs.python.org/3/]
+## References  
+  RFC 2612 - https://tools.ietf.org/html/rfc2616
+  
+  Python Docs - https://docs.python.org/3/
