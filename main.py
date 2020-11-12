@@ -7,6 +7,7 @@ import time
 def stopServer():
     pname = "http_server.py"
     try:
+        # extract process id of http_server.py and kill all running instances
         for line in os.popen(f"ps ax | grep {pname} | grep -v grep"):
             data = line.split()
             pid = data[0]
@@ -19,11 +20,15 @@ def stopServer():
 
 def startServer():
     try:
+        # start server in background
         os.system("sudo python3 http_server.py &")
     except Exception as error:
         # print("Error: ", error)
         print("Failed to start server...")
         sys.exit(1)
+
+
+# default runnning instructions
 
 
 def runInstructions():
@@ -35,6 +40,7 @@ def runInstructions():
     print("\t<start-flag> : start | START\t(To start server)")
     print("\t<stop-flag> : stop | STOP\t(To stop server)")
     print("\t<restart-flag> : restart | RESTART\t(To restart server)")
+    print("\nPlease read README.md for detailed information.")
 
 
 if __name__ == "__main__":

@@ -4,14 +4,18 @@ from configparser import ConfigParser
 import sys
 import os
 import threading
-# from concurrent.futures import ThreadPoolExecutor
 import time
+# from concurrent.futures import ThreadPoolExecutor
 
+# store config data
 CONFIG = None
 
+# store and check debug value
 DEBUG = False
 
 WASTETHREAD = 0
+
+# read config file
 
 
 def readTestFile(fileName=""):
@@ -24,6 +28,7 @@ def readTestFile(fileName=""):
     return testCases
 
 
+# function for load testing for each case
 def loadThreads(case={}, method="", finalurl=""):
     global DEBUG, WASTETHREAD
     response = b''
@@ -107,6 +112,8 @@ def loadThreads(case={}, method="", finalurl=""):
     if DEBUG:
         print(f"{method} : {response}")
 
+# function to start load testing for all cases
+
 
 def startLoadTesting(testCases=[]):
     global CONFIG, WASTETHREAD
@@ -160,6 +167,7 @@ def startLoadTesting(testCases=[]):
 #     print("Took {} seconds.".format(end - start))
 
 
+# function to execute one request at a time for confimation testing
 def confirmationTesting(testCases=[], method=""):
     global CONFIG
     url = "http://localhost:" + str(CONFIG["DEFAULT"]["PORT"])
@@ -187,6 +195,8 @@ def readConfig():
     except Exception as error:
         sys.exit(1)
 
+# default runnning instructions
+
 
 def runInstructions():
     print("Test:")
@@ -198,6 +208,7 @@ def runInstructions():
     print("\t<number-of-request> (optional) : Integer value for multiple same requests present in LTest.json file,\n\t\tDefault value: Number of request objest present in LTest.json.")
     print("\t<method-name> : GET | POST | PUT | DELETE | HEAD (requests present in CTest.json file)")
     print("\t--debug=True : For logging response codes on terminal for respective request methods.")
+    print("\nPlease read README.md for detailed information.")
 
 
 if __name__ == "__main__":
@@ -234,16 +245,6 @@ if __name__ == "__main__":
             except Exception as error:
                 print("Invalid request method.\n")
                 runInstructions()
-            # reqNumber = 1
-            # try:
-            #     intParams = [ele for ele in sys.argv if ele.isdigit()]
-            #     if len(intParams) >= 1:
-            #         reqNumber = int(intParams[0])
-            # except Exception as error:
-            #     print(
-            #         "Invalid number of requests number.\nStarted testing for default number.")
-
-            # concurrentThreads(testCases * reqNumber)
         else:
             runInstructions()
     else:
