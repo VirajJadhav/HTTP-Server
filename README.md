@@ -57,7 +57,6 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
          - "name": filename that is expected to be stored on server 
          - "path": file path from where the client is expected to pick the file (Absolute path is expected) 
          - "fileType" (options): eg = ("text", "image"); (Default is "_/_")
-    
    - possible values:
      - Anything with well defined and valid characters.
      
@@ -87,15 +86,19 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
 2. config.ini (Config file)
    - Present in ConfigFiles/config.ini or (\<absolute-path>/ConfigFiles/config.ini)
    - **Syntax**
+   
      ```
      [SECTION]
      key = value
+     
      eg,
+     
      [DEFAULT]
      PORT = 4000
      ```
 
 ## References  
+
   RFC 2616 - https://tools.ietf.org/html/rfc2616
   
   Python Docs - https://docs.python.org/3/
