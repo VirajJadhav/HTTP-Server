@@ -116,3 +116,5 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
   RFC 2616 - https://tools.ietf.org/html/rfc2616
   
   Python Docs - https://docs.python.org/3/
+  
+  Apache Log - https://httpd.apache.org/docs/2.4/logs.html
