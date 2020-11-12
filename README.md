@@ -51,26 +51,38 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
 1. CTest.json or LTest.json (For testing purpose)
 
    - Key, value pairs expected per object (file is in json format)
-     - possible keys:
+     - possible keys (case-sensitive):
        - "method": which states HTTP method ("GET", "POST", "PUT", "DELETE", "HEAD")
        - "url": url to which the request is sent ("/index.html", "/something", etc); (Default is "/")
        - "data" (Applicable for POST and PUT):
          Again in key, value pairs, eg,
->         "data" = {
->          "name": "Delta-server",
->          "location": "pune",
->          .
->          .
->          .
->         }
        - "file" (Applicable for POST and PUT):
-         Again in key, value pais, possible keys: - "name": filename that is expected to be stored on server - "path": file path from where the client is expected to pick the file (Absolute path is expected) - "fileType" (options): eg - ("text", "image"); (Default is "_/_")
+         Again in key, value pais, possible keys: 
+         - "name": filename that is expected to be stored on server 
+         - "path": file path from where the client is expected to pick the file (Absolute path is expected) 
+         - "fileType" (options): eg = ("text", "image"); (Default is "_/_")
          eg,
->         "file" = {
->          "name": "serverToBeuploaded.txt",
->          "path": "/home/USER/Desktop/somefile.txt",
->          "fileType": "text"
->        }
+>         {
+>            "method": "POST",
+>            "url": "/something",
+>            "data" = {
+>             "name": "Delta-server",
+>             "location": "pune",
+>             .
+>             .
+>             .
+>           },
+>            "file" = {
+>              "name": "serverToBeuploaded.txt",
+>              "path": "/home/USER/Desktop/somefile.txt",
+>              "fileType": "text"
+>           }
+>         },         
+>         {
+>            "method": "GET",
+>            "url": "/index.html"
+>         }
+
    - possible values:
      - Anything with well defined and valid characters.
 
