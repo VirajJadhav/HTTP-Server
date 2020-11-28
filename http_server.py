@@ -968,9 +968,12 @@ def readConfig():
 
 
 if __name__ == "__main__":
-    # reading config file
-    readConfig()
-    # establishing connection with defined port
-    serverSocket = establishConnection()
-    # starting server
-    startServer(serverSocket)
+    try:
+        # reading config file
+        readConfig()
+        # establishing connection with defined port
+        serverSocket = establishConnection()
+        # starting server
+        startServer(serverSocket)
+    except KeyboardInterrupt:
+        sys.exit(1)
