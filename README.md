@@ -72,13 +72,12 @@ This project is a rudimentary implementation of how a **HTTP** (**HTTP/1.1** wit
   >             .
   >             .
   >             .
-  >             }
-  >           },
+  >            },
   >            "file" = {
   >              "name": "serverToBeuploaded.txt",
   >              "path": "/home/USER/Desktop/somefile.txt",
   >              "fileType": "text"
-  >           }
+  >            }
   >         },         
   >         {
   >            "method": "GET",
