@@ -57,11 +57,19 @@ def loadThreads(case={}, method="", finalurl=""):
                     }
                     if "headers" in case:
                         headers = case["headers"]
-                        response = requests.post(
-                            finalurl, data=data, files=files, headers=headers)
+                        if method == "PUT":
+                            response = requests.put(
+                                finalurl, data=data, files=files, headers=headers)
+                        else:
+                            response = requests.post(
+                                finalurl, data=data, files=files, headers=headers)
                     else:
-                        response = requests.post(
-                            finalurl, data=data, files=files)
+                        if method == "PUT":
+                            response = requests.put(
+                                finalurl, data=data, files=files)
+                        else:
+                            response = requests.post(
+                                finalurl, data=data, files=files)
                 except Exception as error:
                     pass
             elif "data" in case and not "file" in case:
